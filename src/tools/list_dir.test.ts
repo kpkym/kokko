@@ -1,14 +1,8 @@
 import { test, expect } from 'bun:test';
 import { tools } from './index';
-import { mkdtemp, writeFile, mkdir, rm } from 'node:fs/promises';
-import { tmpdir } from 'node:os';
+import { writeFile, mkdir, rm } from 'node:fs/promises';
 import { join } from 'node:path';
-
-const ctx = { toolCallId: 't', messages: [] } as any;
-
-async function makeTempDir(): Promise<string> {
-  return await mkdtemp(join(tmpdir(), 'kokko-test-'));
-}
+import { ctx, makeTempDir } from './test-helpers';
 
 test('list_dir lists children with type markers, alphabetically, including dotfiles', async () => {
   const dir = await makeTempDir();

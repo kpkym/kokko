@@ -1,7 +1,6 @@
 import { test, expect } from 'bun:test';
 import { tools } from './index';
-
-const ctx = { toolCallId: 't', messages: [] } as any;
+import { ctx } from './test-helpers';
 
 test('get_current_time returns an ISO 8601 string', async () => {
   const result = await tools.get_current_time.execute!({}, ctx);

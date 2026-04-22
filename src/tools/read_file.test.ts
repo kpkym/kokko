@@ -1,14 +1,8 @@
 import { test, expect } from 'bun:test';
 import { tools } from './index';
-import { mkdtemp, writeFile, rm } from 'node:fs/promises';
-import { tmpdir } from 'node:os';
+import { writeFile, rm } from 'node:fs/promises';
 import { join } from 'node:path';
-
-const ctx = { toolCallId: 't', messages: [] } as any;
-
-async function makeTempDir(): Promise<string> {
-  return await mkdtemp(join(tmpdir(), 'kokko-test-'));
-}
+import { ctx, makeTempDir } from './test-helpers';
 
 test('read_file returns file contents as a string', async () => {
   const dir = await makeTempDir();
