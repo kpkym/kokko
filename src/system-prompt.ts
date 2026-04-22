@@ -1,3 +1,5 @@
+import { readFileSync } from 'node:fs';
+
 const BUILT_IN_PROMPT = `You are kokko, a terminal-based coding agent. You help the user with software engineering tasks in their current working directory by reading/editing files and running shell commands through the tools provided.
 
 Tool usage principles:
@@ -13,5 +15,7 @@ Output style:
 - Don't narrate what you're about to do at length — just do it and report results.`;
 
 export function loadBasePrompt(): string {
-  return BUILT_IN_PROMPT;
+  const path = process.env.KOKKO_SYSTEM_PROMPT_FILE;
+  if (path === undefined || path === '') return BUILT_IN_PROMPT;
+  return readFileSync(path, 'utf-8');
 }

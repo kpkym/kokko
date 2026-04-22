@@ -1,5 +1,8 @@
 import { test, expect } from 'bun:test';
+import { writeFile, rm } from 'node:fs/promises';
+import { join } from 'node:path';
 import { loadBasePrompt } from './system-prompt';
+import { makeTempDir } from './tools/test-helpers';
 
 test('loadBasePrompt returns built-in default when env unset', () => {
   const prev = process.env.KOKKO_SYSTEM_PROMPT_FILE;
@@ -10,5 +13,20 @@ test('loadBasePrompt returns built-in default when env unset', () => {
     expect(out).toContain('absolute paths');
   } finally {
     if (prev !== undefined) process.env.KOKKO_SYSTEM_PROMPT_FILE = prev;
+  }
+});
+
+test('loadBasePrompt returns file contents when KOKKO_SYSTEM_PROMPT_FILE is set', async () => {
+  const dir = await makeTempDir();
+  const path = join(dir, 'prompt.md');
+  await writeFile(path, 'CUSTOM PROMPT BODY', 'utf-8');
+  const prev = process.env.KOKKO_SYSTEM_PROMPT_FILE;
+  process.env.KOKKO_SYSTEM_PROMPT_FILE = path;
+  try {
+    expect(loadBasePrompt()).toBe('CUSTOM PROMPT BODY');
+  } finally {
+    if (prev !== undefined) process.env.KOKKO_SYSTEM_PROMPT_FILE = prev;
+    else delete process.env.KOKKO_SYSTEM_PROMPT_FILE;
+    await rm(dir, { recursive: true, force: true });
   }
 });
