@@ -1,7 +1,7 @@
 import { test, expect } from 'bun:test';
 import { writeFile, rm, chmod } from 'node:fs/promises';
 import { join } from 'node:path';
-import { loadBasePrompt, loadProjectDocs, formatSystemPrompt, type EnvInfo } from './system-prompt';
+import { loadBasePrompt, loadProjectDocs, formatSystemPrompt, collectEnvInfo, type EnvInfo } from './system-prompt';
 import { makeTempDir } from './tools/test-helpers';
 
 test('loadBasePrompt returns built-in default when env unset', () => {
@@ -139,6 +139,18 @@ test('formatSystemPrompt omits shell line when undefined', () => {
   };
   const out = formatSystemPrompt('BASE', env, []);
   expect(out).not.toContain('shell:');
+});
+
+test('collectEnvInfo returns shape with cwd, platform, date, shell', async () => {
+  const env = await collectEnvInfo('/some/cwd');
+  expect(env.cwd).toBe('/some/cwd');
+  expect(env.platform).toBe(process.platform);
+  expect(env.date).toMatch(/^\d{4}-\d{2}-\d{2}$/);
+  if (process.env.SHELL !== undefined) {
+    expect(env.shell).toBe(process.env.SHELL);
+  } else {
+    expect(env.shell).toBeUndefined();
+  }
 });
 
 test('formatSystemPrompt assembles base + environment + project_docs in order', () => {

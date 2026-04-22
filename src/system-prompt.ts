@@ -40,6 +40,16 @@ export interface EnvInfo {
   gitBranch: string | null;
 }
 
+export async function collectEnvInfo(cwd: string): Promise<EnvInfo> {
+  return {
+    cwd,
+    platform: process.platform,
+    shell: process.env.SHELL,
+    date: new Date().toISOString().slice(0, 10),
+    gitBranch: null,
+  };
+}
+
 export function formatSystemPrompt(
   base: string,
   env: EnvInfo,
