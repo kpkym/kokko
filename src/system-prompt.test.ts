@@ -154,6 +154,22 @@ test('collectEnvInfo returns shape with cwd, platform, date, shell', async () =>
   expect(env.gitBranch).toBeNull();
 });
 
+test('collectEnvInfo gitBranch is a string when cwd is a git repo', async () => {
+  const env = await collectEnvInfo('/Users/kpkym/ooo/homelab/github/kokko');
+  expect(typeof env.gitBranch).toBe('string');
+  expect(env.gitBranch!.length).toBeGreaterThan(0);
+});
+
+test('collectEnvInfo gitBranch is null when cwd is not a git repo', async () => {
+  const dir = await makeTempDir();
+  try {
+    const env = await collectEnvInfo(dir);
+    expect(env.gitBranch).toBeNull();
+  } finally {
+    await rm(dir, { recursive: true, force: true });
+  }
+});
+
 test('formatSystemPrompt assembles base + environment + project_docs in order', () => {
   const env: EnvInfo = {
     cwd: '/proj',

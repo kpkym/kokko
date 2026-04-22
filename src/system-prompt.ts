@@ -40,13 +40,42 @@ export interface EnvInfo {
   gitBranch: string | null;
 }
 
+const GIT_BRANCH_TIMEOUT_MS = 1000;
+
+async function readGitBranch(cwd: string): Promise<string | null> {
+  let proc: ReturnType<typeof Bun.spawn>;
+  try {
+    proc = Bun.spawn(['git', '-C', cwd, 'rev-parse', '--abbrev-ref', 'HEAD'], {
+      stdout: 'pipe',
+      stderr: 'ignore',
+    });
+  } catch {
+    return null;
+  }
+  const term = setTimeout(() => proc.kill('SIGTERM'), GIT_BRANCH_TIMEOUT_MS);
+  term.unref();
+  try {
+    const [stdoutBuf, exitCode] = await Promise.all([
+      new Response(proc.stdout).arrayBuffer(),
+      proc.exited,
+    ]);
+    if (exitCode !== 0) return null;
+    const out = new TextDecoder('utf-8').decode(new Uint8Array(stdoutBuf)).trim();
+    return out.length > 0 ? out : null;
+  } catch {
+    return null;
+  } finally {
+    clearTimeout(term);
+  }
+}
+
 export async function collectEnvInfo(cwd: string): Promise<EnvInfo> {
   return {
     cwd,
     platform: process.platform,
     shell: process.env.SHELL,
     date: new Date().toLocaleDateString('sv'), // 'sv' (Swedish) locale formats as YYYY-MM-DD in local TZ
-    gitBranch: null,
+    gitBranch: await readGitBranch(cwd),
   };
 }
 
