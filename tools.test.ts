@@ -384,3 +384,18 @@ test('bash reports non-zero exit code without throwing', async () => {
   )) as string;
   expect(result).toContain('[exit code: 3]');
 });
+
+test('bash respects cwd', async () => {
+  const dir = await makeTempDir();
+  try {
+    const result = (await tools.bash.execute!(
+      { command: 'pwd', cwd: dir },
+      ctx,
+    )) as string;
+    // macOS /tmp is a symlink to /private/tmp; accept either realpath.
+    expect(result.includes(dir) || result.includes('/private' + dir)).toBe(true);
+    expect(result).toContain('[exit code: 0]');
+  } finally {
+    await rm(dir, { recursive: true, force: true });
+  }
+});
