@@ -22,7 +22,11 @@ step cap is hit.
 
 Starter tools (see `tools.ts`):
 - `get_current_time` — no args, returns an ISO 8601 timestamp.
-- `read_file({ path })` — reads a text file via `Bun.file`.
+- `read_file({ path, offset?, limit? })` — reads a UTF-8 text file at an absolute path. 1-based `offset`/`limit` page through long files; caps at 2000 lines / 256KB; refuses binary files.
+- `write_file({ path, content })` — writes (or overwrites) a UTF-8 text file at an absolute path. Creates parent directories. Rejects content >10MB.
+- `edit_file({ path, old_string, new_string, replace_all? })` — exact string replacement. `old_string` must appear exactly once unless `replace_all=true`.
+- `list_dir({ path })` — lists direct children of a directory. `/` suffix = directory, `@` = symlink. Caps at 1000 entries.
+- `glob({ pattern, cwd })` — glob-matches files under an absolute `cwd`. Returns absolute paths. Caps at 1000 matches.
 
 Tool events are shown inline in the stream:
 
