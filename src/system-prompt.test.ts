@@ -126,7 +126,7 @@ test('formatSystemPrompt omits git_branch line when null', () => {
   };
   const out = formatSystemPrompt('BASE', env, []);
   expect(out).not.toContain('git_branch');
-  expect(out).not.toContain('null');
+  expect(out).toContain('<environment>');
 });
 
 test('formatSystemPrompt omits shell line when undefined', () => {
