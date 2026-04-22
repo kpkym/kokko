@@ -129,3 +129,48 @@ test('grep count mode returns (no matches) when pattern misses', async () => {
     await rm(dir, { recursive: true, force: true });
   }
 });
+
+test('grep content mode emits file:line:text with line numbers', async () => {
+  const dir = await makeTempDir();
+  try {
+    await writeFile(join(dir, 'a.ts'), 'line1\nhello line2\nline3\n');
+    const result = (await tools.grep.execute!(
+      { pattern: 'hello', path: dir, output_mode: 'content' },
+      ctx,
+    )) as string;
+    expect(result).toBe(`${join(dir, 'a.ts')}:2:hello line2`);
+  } finally {
+    await rm(dir, { recursive: true, force: true });
+  }
+});
+
+test('grep content mode returns (no matches) when pattern misses', async () => {
+  const dir = await makeTempDir();
+  try {
+    await writeFile(join(dir, 'a.ts'), 'nothing\n');
+    const result = await tools.grep.execute!(
+      { pattern: 'nope', path: dir, output_mode: 'content' },
+      ctx,
+    );
+    expect(result).toBe('(no matches)');
+  } finally {
+    await rm(dir, { recursive: true, force: true });
+  }
+});
+
+test('grep content mode truncates at 250 lines by default', async () => {
+  const dir = await makeTempDir();
+  try {
+    const lines = Array.from({ length: 300 }, (_, i) => `hello ${i}`).join('\n') + '\n';
+    await writeFile(join(dir, 'a.ts'), lines);
+    const result = (await tools.grep.execute!(
+      { pattern: 'hello', path: dir, output_mode: 'content' },
+      ctx,
+    )) as string;
+    expect(result.startsWith('[truncated: kept first 250 lines]\n')).toBe(true);
+    const body = result.split('\n').slice(1);
+    expect(body.length).toBe(250);
+  } finally {
+    await rm(dir, { recursive: true, force: true });
+  }
+});

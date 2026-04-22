@@ -125,6 +125,63 @@ async function runCount(
   return capWithHeader(rows, headLimit).body;
 }
 
+interface ContentInputs extends FlagInputs {
+  line_numbers: boolean;
+  before_context?: number;
+  after_context?: number;
+  context?: number;
+}
+
+async function runContent(
+  pattern: string,
+  path: string,
+  headLimit: number,
+  input: ContentInputs,
+): Promise<string> {
+  const flags = [...buildCommonFlags(input), '--no-heading'];
+  if (input.line_numbers) flags.push('--line-number');
+  if (input.before_context !== undefined) flags.push('-B', String(input.before_context));
+  if (input.after_context !== undefined) flags.push('-A', String(input.after_context));
+  if (input.context !== undefined) flags.push('-C', String(input.context));
+
+  const { stdout, stderr, exitCode, timedOut } = await runRg(flags, pattern, path);
+  if (timedOut) {
+    throw new Error(`grep: timed out after ${GREP_LIMITS.timeoutMs}ms; process killed`);
+  }
+  if (exitCode === 1) return '(no matches)';
+  if (exitCode >= 2) throw new Error(stderr.trim() || `grep: rg exited ${exitCode}`);
+
+  const byteCap = LIMITS.maxBytes;
+  const rawBytes = new TextEncoder().encode(stdout);
+  const totalBytes = rawBytes.length;
+
+  let body: string;
+  let byteHeader: string | null = null;
+  if (totalBytes > byteCap) {
+    body = new TextDecoder('utf-8').decode(rawBytes.subarray(0, byteCap));
+    byteHeader = `[truncated: kept first ${byteCap} of ${totalBytes} bytes]`;
+  } else {
+    body = stdout;
+  }
+
+  const lines = body.split('\n');
+  if (lines.length > 0 && lines[lines.length - 1] === '') lines.pop();
+  if (lines.length === 0 && byteHeader === null) return '(no matches)';
+
+  let lineHeader: string | null = null;
+  let kept = lines;
+  if (kept.length > headLimit) {
+    lineHeader = `[truncated: kept first ${headLimit} lines]`;
+    kept = kept.slice(0, headLimit);
+  }
+
+  const parts: string[] = [];
+  if (lineHeader) parts.push(lineHeader);
+  if (byteHeader) parts.push(byteHeader);
+  parts.push(kept.join('\n'));
+  return parts.join('\n');
+}
+
 export const grep = tool({
   description:
     'Search file contents under an absolute path using ripgrep. ' +
@@ -191,6 +248,15 @@ export const grep = tool({
         multiline: input.multiline ?? false,
       });
     }
-    return '(no matches)';
+    return await runContent(input.pattern, input.path, headLimit, {
+      glob: input.glob,
+      type: input.type,
+      case_insensitive: input.case_insensitive ?? false,
+      multiline: input.multiline ?? false,
+      line_numbers: input.line_numbers ?? true,
+      before_context: input.before_context,
+      after_context: input.after_context,
+      context: input.context,
+    });
   },
 });
