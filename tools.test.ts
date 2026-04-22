@@ -365,3 +365,14 @@ test('bash echoes stdout and reports exit 0', async () => {
   expect(result).toContain('[exit code: 0]');
   expect(result).not.toContain('--- stderr ---');
 });
+
+test('bash captures stderr separately from stdout', async () => {
+  const result = (await tools.bash.execute!(
+    { command: 'echo out; echo oops 1>&2' },
+    ctx,
+  )) as string;
+  expect(result).toContain('out');
+  expect(result).toContain('--- stderr ---');
+  expect(result).toContain('oops');
+  expect(result).toContain('[exit code: 0]');
+});
