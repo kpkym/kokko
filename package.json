@@ -4,7 +4,8 @@
   "type": "module",
   "private": true,
   "scripts": {
-    "start": "bun run index.ts"
+    "start": "bun run index.ts",
+    "devtools": "bunx @ai-sdk/devtools"
   },
   "devDependencies": {
     "@types/bun": "latest",
@@ -15,6 +16,7 @@
   },
   "dependencies": {
     "@ai-sdk/anthropic": "^3.0.71",
+    "@ai-sdk/devtools": "^0.0.15",
     "@ai-sdk/openai": "^3.0.53",
     "ai": "^6.0.168"
   }

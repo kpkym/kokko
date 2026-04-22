@@ -1,6 +1,7 @@
 import { createOpenAI } from '@ai-sdk/openai';
 import { createAnthropic } from '@ai-sdk/anthropic';
-import type { LanguageModel } from 'ai';
+import { devToolsMiddleware } from '@ai-sdk/devtools';
+import { wrapLanguageModel, type LanguageModel } from 'ai';
 
 export type Provider = 'openai' | 'anthropic';
 
@@ -47,10 +48,16 @@ function loadConfig(): Config {
 export const config: Config = loadConfig();
 
 export function resolveModel(cfg: Config = config): LanguageModel {
-  switch (cfg.provider) {
-    case 'openai':
-      return createOpenAI({ baseURL: cfg.baseURL })(cfg.model);
-    case 'anthropic':
-      return createAnthropic({ baseURL: cfg.baseURL })(cfg.model);
-  }
+  const base = (() => {
+    switch (cfg.provider) {
+      case 'openai':
+        return createOpenAI({ baseURL: cfg.baseURL })(cfg.model);
+      case 'anthropic':
+        return createAnthropic({ baseURL: cfg.baseURL })(cfg.model);
+    }
+  })();
+  return wrapLanguageModel({
+    model: base,
+    middleware: devToolsMiddleware(),
+  });
 }
