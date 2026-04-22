@@ -23,6 +23,7 @@ function formatArgs(input: unknown): string {
 }
 
 function formatResultSummary(output: unknown): string {
+  if (output === undefined) return 'ok (no output)';
   const s = typeof output === 'string' ? output : JSON.stringify(output);
   return `ok (${s.length} chars)`;
 }
@@ -51,6 +52,7 @@ async function main() {
 
     process.stdout.write('\nAssistant: ');
     let lineOpen = true;
+    let streamAborted = false;
 
     try {
       for await (const part of result.fullStream) {
@@ -84,16 +86,20 @@ async function main() {
             if (lineOpen) process.stdout.write('\n');
             process.stdout.write(`[stream error] ${formatErrorSummary(part.error)}\n`);
             lineOpen = false;
+            streamAborted = true;
             break;
           }
         }
+        if (streamAborted) break;
       }
 
       if (lineOpen) process.stdout.write('\n');
       process.stdout.write('\n');
 
-      const response = await result.response;
-      messages.push(...response.messages);
+      if (!streamAborted) {
+        const response = await result.response;
+        messages.push(...response.messages);
+      }
     } catch (err) {
       if (lineOpen) process.stdout.write('\n');
       process.stdout.write(`[stream error] ${formatErrorSummary(err)}\n\n`);
