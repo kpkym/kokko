@@ -3,9 +3,6 @@ export const LIMITS = {
   maxBytes: 262_144,
   maxWriteBytes: 10_485_760,
   maxEntries: 1000,
-  maxBashBytes: 30_000,
-  defaultTimeoutMs: 120_000,
-  maxTimeoutMs: 600_000,
 } as const;
 
 export function requireAbsolute(path: string): void {

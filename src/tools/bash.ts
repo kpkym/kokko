@@ -1,6 +1,12 @@
 import { tool } from 'ai';
 import { z } from 'zod';
-import { LIMITS, requireAbsolute, truncateTail } from './shared';
+import { requireAbsolute, truncateTail } from './shared';
+
+const BASH_LIMITS = {
+  maxBashBytes: 30_000,
+  defaultTimeoutMs: 120_000,
+  maxTimeoutMs: 600_000,
+} as const;
 
 function formatBashResult(
   stdoutBytes: Uint8Array,
@@ -9,19 +15,19 @@ function formatBashResult(
   timedOut: boolean,
   timeoutMs: number,
 ): string {
-  const out = truncateTail(stdoutBytes, LIMITS.maxBashBytes);
-  const err = truncateTail(stderrBytes, LIMITS.maxBashBytes);
+  const out = truncateTail(stdoutBytes, BASH_LIMITS.maxBashBytes);
+  const err = truncateTail(stderrBytes, BASH_LIMITS.maxBashBytes);
 
   const parts: string[] = [];
   if (out.truncated) {
-    parts.push(`[truncated: kept last ${LIMITS.maxBashBytes} of ${out.total} bytes]`);
+    parts.push(`[truncated: kept last ${BASH_LIMITS.maxBashBytes} of ${out.total} bytes]`);
   }
   if (out.text.length > 0) parts.push(out.text);
 
   if (stderrBytes.length > 0) {
     parts.push('--- stderr ---');
     if (err.truncated) {
-      parts.push(`[truncated: kept last ${LIMITS.maxBashBytes} of ${err.total} bytes]`);
+      parts.push(`[truncated: kept last ${BASH_LIMITS.maxBashBytes} of ${err.total} bytes]`);
     }
     parts.push(err.text);
   }
@@ -45,7 +51,7 @@ export const bash = tool({
       .number()
       .int()
       .min(1)
-      .max(LIMITS.maxTimeoutMs)
+      .max(BASH_LIMITS.maxTimeoutMs)
       .optional()
       .describe('Timeout in milliseconds. Default 120000, max 600000.'),
     cwd: z
@@ -55,12 +61,12 @@ export const bash = tool({
   }),
   execute: async ({ command, timeout_ms, cwd }) => {
     if (cwd !== undefined) requireAbsolute(cwd);
-    if (timeout_ms !== undefined && (timeout_ms < 1 || timeout_ms > LIMITS.maxTimeoutMs)) {
+    if (timeout_ms !== undefined && (timeout_ms < 1 || timeout_ms > BASH_LIMITS.maxTimeoutMs)) {
       throw new Error(
-        `bash: timeout_ms must be between 1 and ${LIMITS.maxTimeoutMs} (got ${timeout_ms})`,
+        `bash: timeout_ms must be between 1 and ${BASH_LIMITS.maxTimeoutMs} (got ${timeout_ms})`,
       );
     }
-    const timeoutMs = timeout_ms ?? LIMITS.defaultTimeoutMs;
+    const timeoutMs = timeout_ms ?? BASH_LIMITS.defaultTimeoutMs;
 
     const proc = Bun.spawn(['/bin/bash', '-c', command], {
       cwd: cwd ?? process.cwd(),
