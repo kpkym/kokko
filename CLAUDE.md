@@ -41,7 +41,7 @@ The codebase is deliberately small; three layers matter.
 - `detectBinary(bytes)` — NUL-byte scan of the first 8KB; used by `read_file` to refuse binaries.
 - `truncateTail(bytes, cap)` — keeps the last `cap` bytes and reports total; used by `bash` for stdout/stderr capping.
 
-Tools prefer Bun-native APIs (`Bun.file`, `Bun.write`, `Bun.Glob`, `Bun.spawn`) over `node:fs`. `bash` uses `Bun.spawn(['/bin/bash', '-c', command])` with a SIGTERM → 2 s grace → SIGKILL timeout chain and returns a formatted string containing stdout, an optional `--- stderr ---` block, and a trailing `[exit code: N]` — non-zero exits are returned, not thrown.
+Tools prefer Bun-native APIs (`Bun.file`, `Bun.write`, `Bun.Glob`, `Bun.spawn`) over `node:fs`. `bash` uses `Bun.spawn(['/bin/bash', '-c', command])` with a SIGTERM → 2 s grace → SIGKILL timeout chain and returns a formatted string containing stdout, an optional `--- stderr ---` block, and a trailing `[exit code: N]` — non-zero exits are returned, not thrown. `grep` shells out to system `ripgrep` with three output modes (`content` / `files_with_matches` / `count`); hidden + gitignored files are always searched, 60 s timeout.
 
 ### Adding a tool
 
