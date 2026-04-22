@@ -228,3 +228,20 @@ test('grep accepts a single file path (not only a directory)', async () => {
     await rm(dir, { recursive: true, force: true });
   }
 });
+
+test('grep searches hidden files and ignores .gitignore', async () => {
+  const dir = await makeTempDir();
+  try {
+    await writeFile(join(dir, '.hidden.ts'), 'hello hidden\n');
+    await writeFile(join(dir, 'ignored.ts'), 'hello ignored\n');
+    await writeFile(join(dir, '.gitignore'), 'ignored.ts\n');
+    const result = (await tools.grep.execute!(
+      { pattern: 'hello', path: dir },
+      ctx,
+    )) as string;
+    expect(result).toContain(join(dir, '.hidden.ts'));
+    expect(result).toContain(join(dir, 'ignored.ts'));
+  } finally {
+    await rm(dir, { recursive: true, force: true });
+  }
+});
