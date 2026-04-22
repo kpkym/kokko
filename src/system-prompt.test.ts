@@ -1,7 +1,7 @@
 import { test, expect } from 'bun:test';
 import { writeFile, rm, chmod } from 'node:fs/promises';
 import { join } from 'node:path';
-import { loadBasePrompt, loadProjectDocs, formatSystemPrompt, collectEnvInfo, type EnvInfo } from './system-prompt';
+import { loadBasePrompt, loadProjectDocs, formatSystemPrompt, collectEnvInfo, buildSystemPrompt, type EnvInfo } from './system-prompt';
 import { makeTempDir } from './tools/test-helpers';
 
 test('loadBasePrompt returns built-in default when env unset', () => {
@@ -178,6 +178,39 @@ test('collectEnvInfo shell is undefined when SHELL env var is unset', async () =
     expect(env.shell).toBeUndefined();
   } finally {
     if (prev !== undefined) process.env.SHELL = prev;
+  }
+});
+
+test('buildSystemPrompt composes base + env + docs end-to-end', async () => {
+  const dir = await makeTempDir();
+  await writeFile(join(dir, 'CLAUDE.md'), 'PROJECT-RULES', 'utf-8');
+  const prevPrompt = process.env.KOKKO_SYSTEM_PROMPT_FILE;
+  delete process.env.KOKKO_SYSTEM_PROMPT_FILE;
+  try {
+    const out = await buildSystemPrompt(dir);
+    expect(out).toContain('<base>');
+    expect(out).toContain('You are kokko');
+    expect(out).toContain('<environment>');
+    expect(out).toContain(`cwd: ${dir}`);
+    expect(out).toContain(`platform: ${process.platform}`);
+    expect(out).not.toContain('git_branch');
+    expect(out).toContain('<project_docs>');
+    expect(out).toContain('<file name="CLAUDE.md">');
+    expect(out).toContain('PROJECT-RULES');
+  } finally {
+    if (prevPrompt !== undefined) process.env.KOKKO_SYSTEM_PROMPT_FILE = prevPrompt;
+    await rm(dir, { recursive: true, force: true });
+  }
+});
+
+test('buildSystemPrompt defaults cwd to process.cwd()', async () => {
+  const prevPrompt = process.env.KOKKO_SYSTEM_PROMPT_FILE;
+  delete process.env.KOKKO_SYSTEM_PROMPT_FILE;
+  try {
+    const out = await buildSystemPrompt();
+    expect(out).toContain(`cwd: ${process.cwd()}`);
+  } finally {
+    if (prevPrompt !== undefined) process.env.KOKKO_SYSTEM_PROMPT_FILE = prevPrompt;
   }
 });
 

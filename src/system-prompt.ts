@@ -111,6 +111,13 @@ export function formatSystemPrompt(
   return blocks.join('\n\n');
 }
 
+export async function buildSystemPrompt(cwd: string = process.cwd()): Promise<string> {
+  const base = loadBasePrompt();
+  const env = await collectEnvInfo(cwd);
+  const docs = await loadProjectDocs(cwd);
+  return formatSystemPrompt(base, env, docs);
+}
+
 export function loadBasePrompt(): string {
   const path = process.env.KOKKO_SYSTEM_PROMPT_FILE;
   if (path === undefined || path === '') return BUILT_IN_PROMPT;
