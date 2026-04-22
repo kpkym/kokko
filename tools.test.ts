@@ -376,3 +376,11 @@ test('bash captures stderr separately from stdout', async () => {
   expect(result).toContain('oops');
   expect(result).toContain('[exit code: 0]');
 });
+
+test('bash reports non-zero exit code without throwing', async () => {
+  const result = (await tools.bash.execute!(
+    { command: 'exit 3' },
+    ctx,
+  )) as string;
+  expect(result).toContain('[exit code: 3]');
+});
