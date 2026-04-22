@@ -4,6 +4,7 @@ import { write_file } from './write_file';
 import { edit_file } from './edit_file';
 import { list_dir } from './list_dir';
 import { glob } from './glob';
+import { grep } from './grep';
 import { bash } from './bash';
 
 export const tools = {
@@ -13,5 +14,6 @@ export const tools = {
   edit_file,
   list_dir,
   glob,
+  grep,
   bash,
 };
