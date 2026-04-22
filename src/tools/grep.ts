@@ -227,6 +227,15 @@ export const grep = tool({
   }),
   execute: async (input) => {
     requireAbsolute(input.path);
+    const hasContext =
+      input.before_context !== undefined ||
+      input.after_context !== undefined ||
+      input.context !== undefined;
+    if (hasContext && (input.output_mode ?? 'files_with_matches') !== 'content') {
+      throw new Error(
+        'grep: context flags (before_context/after_context/context) require output_mode="content"',
+      );
+    }
     const mode: OutputMode = input.output_mode ?? 'files_with_matches';
     const defaultCap =
       mode === 'content' ? GREP_LIMITS.contentDefaultLines : LIMITS.maxEntries;

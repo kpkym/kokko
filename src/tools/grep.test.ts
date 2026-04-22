@@ -193,3 +193,23 @@ test('grep content mode context:1 pulls one line before and after', async () => 
     await rm(dir, { recursive: true, force: true });
   }
 });
+
+test('grep throws when context flags are set in a non-content mode', async () => {
+  const dir = await makeTempDir();
+  try {
+    await writeFile(join(dir, 'a.ts'), 'hello\n');
+    await expect(
+      tools.grep.execute!(
+        {
+          pattern: 'hello',
+          path: dir,
+          output_mode: 'files_with_matches',
+          context: 2,
+        },
+        ctx,
+      ),
+    ).rejects.toThrow(/context flags.*output_mode.*content/i);
+  } finally {
+    await rm(dir, { recursive: true, force: true });
+  }
+});
