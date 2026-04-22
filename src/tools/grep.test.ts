@@ -95,3 +95,37 @@ test('grep glob filter restricts matched files by extension', async () => {
     await rm(dir, { recursive: true, force: true });
   }
 });
+
+test('grep count mode emits path:N per file, sorted', async () => {
+  const dir = await makeTempDir();
+  try {
+    await writeFile(join(dir, 'a.ts'), 'hello\nhello\nhello\n');       // 3 matches
+    await writeFile(join(dir, 'b.ts'), 'hello\nhello\nhello\nhello\nhello\n'); // 5 matches
+    await writeFile(join(dir, 'c.ts'), 'no match here\n');
+    const result = (await tools.grep.execute!(
+      { pattern: 'hello', path: dir, output_mode: 'count' },
+      ctx,
+    )) as string;
+    const lines = result.split('\n');
+    expect(lines).toEqual([
+      `${join(dir, 'a.ts')}:3`,
+      `${join(dir, 'b.ts')}:5`,
+    ]);
+  } finally {
+    await rm(dir, { recursive: true, force: true });
+  }
+});
+
+test('grep count mode returns (no matches) when pattern misses', async () => {
+  const dir = await makeTempDir();
+  try {
+    await writeFile(join(dir, 'a.ts'), 'hi\n');
+    const result = await tools.grep.execute!(
+      { pattern: 'nope', path: dir, output_mode: 'count' },
+      ctx,
+    );
+    expect(result).toBe('(no matches)');
+  } finally {
+    await rm(dir, { recursive: true, force: true });
+  }
+});

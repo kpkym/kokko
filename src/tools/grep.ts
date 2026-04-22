@@ -107,6 +107,24 @@ async function runFilesWithMatches(
   return capWithHeader(paths, headLimit).body;
 }
 
+async function runCount(
+  pattern: string,
+  path: string,
+  headLimit: number,
+  flagInputs: FlagInputs,
+): Promise<string> {
+  const flags = [...buildCommonFlags(flagInputs), '--count', '--no-messages'];
+  const { stdout, stderr, exitCode, timedOut } = await runRg(flags, pattern, path);
+  if (timedOut) {
+    throw new Error(`grep: timed out after ${GREP_LIMITS.timeoutMs}ms; process killed`);
+  }
+  if (exitCode === 1) return '(no matches)';
+  if (exitCode >= 2) throw new Error(stderr.trim() || `grep: rg exited ${exitCode}`);
+  const rows = stdout.split('\n').filter((l) => l.length > 0).sort();
+  if (rows.length === 0) return '(no matches)';
+  return capWithHeader(rows, headLimit).body;
+}
+
 export const grep = tool({
   description:
     'Search file contents under an absolute path using ripgrep. ' +
@@ -159,6 +177,14 @@ export const grep = tool({
 
     if (mode === 'files_with_matches') {
       return await runFilesWithMatches(input.pattern, input.path, headLimit, {
+        glob: input.glob,
+        type: input.type,
+        case_insensitive: input.case_insensitive ?? false,
+        multiline: input.multiline ?? false,
+      });
+    }
+    if (mode === 'count') {
+      return await runCount(input.pattern, input.path, headLimit, {
         glob: input.glob,
         type: input.type,
         case_insensitive: input.case_insensitive ?? false,
