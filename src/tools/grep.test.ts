@@ -60,3 +60,38 @@ test('grep files_with_matches truncates at 1000 entries', async () => {
     await rm(dir, { recursive: true, force: true });
   }
 });
+
+test('grep case_insensitive matches lower and upper case', async () => {
+  const dir = await makeTempDir();
+  try {
+    await writeFile(join(dir, 'a.ts'), 'HELLO\n');
+    const caseSensitive = await tools.grep.execute!(
+      { pattern: 'hello', path: dir },
+      ctx,
+    );
+    expect(caseSensitive).toBe('(no matches)');
+    const insensitive = (await tools.grep.execute!(
+      { pattern: 'hello', path: dir, case_insensitive: true },
+      ctx,
+    )) as string;
+    expect(insensitive).toContain('a.ts');
+  } finally {
+    await rm(dir, { recursive: true, force: true });
+  }
+});
+
+test('grep glob filter restricts matched files by extension', async () => {
+  const dir = await makeTempDir();
+  try {
+    await writeFile(join(dir, 'a.ts'), 'hello\n');
+    await writeFile(join(dir, 'b.md'), 'hello\n');
+    const result = (await tools.grep.execute!(
+      { pattern: 'hello', path: dir, glob: '*.ts' },
+      ctx,
+    )) as string;
+    expect(result).toContain('a.ts');
+    expect(result).not.toContain('b.md');
+  } finally {
+    await rm(dir, { recursive: true, force: true });
+  }
+});

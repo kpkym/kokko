@@ -61,8 +61,20 @@ async function runRg(flags: string[], pattern: string, path: string): Promise<Sp
   }
 }
 
-function buildBaseFlags(): string[] {
-  return ['--color=never', '--hidden', '--no-ignore'];
+interface FlagInputs {
+  glob?: string;
+  type?: string;
+  case_insensitive: boolean;
+  multiline: boolean;
+}
+
+function buildCommonFlags(input: FlagInputs): string[] {
+  const flags: string[] = ['--color=never', '--hidden', '--no-ignore'];
+  if (input.glob !== undefined) flags.push('--glob', input.glob);
+  if (input.type !== undefined) flags.push('--type', input.type);
+  if (input.case_insensitive) flags.push('-i');
+  if (input.multiline) flags.push('-U', '--multiline-dotall');
+  return flags;
 }
 
 function capWithHeader(
@@ -81,8 +93,9 @@ async function runFilesWithMatches(
   pattern: string,
   path: string,
   headLimit: number,
+  flagInputs: FlagInputs,
 ): Promise<string> {
-  const flags = [...buildBaseFlags(), '--files-with-matches', '--no-messages'];
+  const flags = [...buildCommonFlags(flagInputs), '--files-with-matches', '--no-messages'];
   const { stdout, stderr, exitCode, timedOut } = await runRg(flags, pattern, path);
   if (timedOut) {
     throw new Error(`grep: timed out after ${GREP_LIMITS.timeoutMs}ms; process killed`);
@@ -145,7 +158,12 @@ export const grep = tool({
     const headLimit = input.head_limit ?? defaultCap;
 
     if (mode === 'files_with_matches') {
-      return await runFilesWithMatches(input.pattern, input.path, headLimit);
+      return await runFilesWithMatches(input.pattern, input.path, headLimit, {
+        glob: input.glob,
+        type: input.type,
+        case_insensitive: input.case_insensitive ?? false,
+        multiline: input.multiline ?? false,
+      });
     }
     return '(no matches)';
   },
