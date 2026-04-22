@@ -422,3 +422,15 @@ test('bash rejects timeout_ms over the cap', async () => {
     ),
   ).rejects.toThrow();
 });
+
+test('bash times out and marks the process killed', async () => {
+  const start = Date.now();
+  const result = (await tools.bash.execute!(
+    { command: 'sleep 5', timeout_ms: 200 },
+    ctx,
+  )) as string;
+  const elapsed = Date.now() - start;
+  expect(elapsed).toBeLessThan(2500);
+  expect(result).toContain('[timed out after 200ms; process killed]');
+  expect(result).toMatch(/\[exit code: -?\d+\]/);
+});
