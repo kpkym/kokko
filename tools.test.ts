@@ -450,3 +450,13 @@ test('bash truncates large stdout to the last 30000 bytes', async () => {
   const body = afterHeader.slice(0, 30000);
   expect(body).toBe('a'.repeat(30000));
 });
+
+test('bash handles large stdout past the ArrayBuffer threshold', async () => {
+  // 500 KB of 'a' — reliably above Bun's Response.bytes() → ArrayBuffer boundary (~200 KB).
+  const result = (await tools.bash.execute!(
+    { command: "yes a | tr -d '\\n' | head -c 500000" },
+    ctx,
+  )) as string;
+  expect(result).toContain('[truncated: kept last 30000 of 500000 bytes]');
+  expect(result).toContain('[exit code: 0]');
+});

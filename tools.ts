@@ -310,11 +310,13 @@ export const tools = {
       term.unref();
 
       try {
-        const [stdoutBytes, stderrBytes, exitCode] = await Promise.all([
-          new Response(proc.stdout).bytes(),
-          new Response(proc.stderr).bytes(),
+        const [stdoutBuf, stderrBuf, exitCode] = await Promise.all([
+          new Response(proc.stdout).arrayBuffer(),
+          new Response(proc.stderr).arrayBuffer(),
           proc.exited,
         ]);
+        const stdoutBytes = new Uint8Array(stdoutBuf);
+        const stderrBytes = new Uint8Array(stderrBuf);
         return formatBashResult(stdoutBytes, stderrBytes, exitCode, timedOut, timeoutMs);
       } finally {
         clearTimeout(term);
