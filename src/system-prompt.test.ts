@@ -30,3 +30,14 @@ test('loadBasePrompt returns file contents when KOKKO_SYSTEM_PROMPT_FILE is set'
     await rm(dir, { recursive: true, force: true });
   }
 });
+
+test('loadBasePrompt throws when KOKKO_SYSTEM_PROMPT_FILE points to nonexistent path', () => {
+  const prev = process.env.KOKKO_SYSTEM_PROMPT_FILE;
+  process.env.KOKKO_SYSTEM_PROMPT_FILE = '/tmp/kokko-does-not-exist-xyz123.md';
+  try {
+    expect(() => loadBasePrompt()).toThrow(/ENOENT|no such file/i);
+  } finally {
+    if (prev !== undefined) process.env.KOKKO_SYSTEM_PROMPT_FILE = prev;
+    else delete process.env.KOKKO_SYSTEM_PROMPT_FILE;
+  }
+});
