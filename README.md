@@ -27,6 +27,7 @@ Starter tools (see `tools.ts`):
 - `edit_file({ path, old_string, new_string, replace_all? })` — exact string replacement. `old_string` must appear exactly once unless `replace_all=true`.
 - `list_dir({ path })` — lists direct children of a directory. `/` suffix = directory, `@` = symlink. Caps at 1000 entries.
 - `glob({ pattern, cwd })` — glob-matches files under an absolute `cwd`. Returns absolute paths. Caps at 1000 matches.
+- `bash({ command, timeout_ms?, cwd? })` — runs `/bin/bash -c <command>`. Captures stdout and stderr separately and appends `[exit code: N]`. Default timeout 2 min, max 10 min; on timeout, SIGTERM → 2 s grace → SIGKILL. Each stream truncated to the last 30 KB. Non-zero exits are returned, not thrown.
 
 Tool events are shown inline in the stream:
 
