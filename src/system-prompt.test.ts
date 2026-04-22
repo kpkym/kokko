@@ -1,5 +1,5 @@
 import { test, expect } from 'bun:test';
-import { writeFile, rm } from 'node:fs/promises';
+import { writeFile, rm, chmod } from 'node:fs/promises';
 import { join } from 'node:path';
 import { loadBasePrompt, loadProjectDocs } from './system-prompt';
 import { makeTempDir } from './tools/test-helpers';
@@ -85,6 +85,19 @@ test('loadProjectDocs returns both files in fixed CLAUDE.md → AGENT.md order',
       { name: 'AGENT.md', contents: 'A-BODY' },
     ]);
   } finally {
+    await rm(dir, { recursive: true, force: true });
+  }
+});
+
+test('loadProjectDocs throws when CLAUDE.md is present but unreadable', async () => {
+  const dir = await makeTempDir();
+  const path = join(dir, 'CLAUDE.md');
+  await writeFile(path, 'secret', 'utf-8');
+  await chmod(path, 0o000);
+  try {
+    await expect(loadProjectDocs(dir)).rejects.toThrow();
+  } finally {
+    await chmod(path, 0o644);
     await rm(dir, { recursive: true, force: true });
   }
 });
