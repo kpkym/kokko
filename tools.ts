@@ -285,6 +285,11 @@ export const tools = {
     }),
     execute: async ({ command, timeout_ms, cwd }) => {
       if (cwd !== undefined) requireAbsolute(cwd);
+      if (timeout_ms !== undefined && (timeout_ms < 1 || timeout_ms > LIMITS.maxTimeoutMs)) {
+        throw new Error(
+          `bash: timeout_ms must be between 1 and ${LIMITS.maxTimeoutMs} (got ${timeout_ms})`,
+        );
+      }
       const timeoutMs = timeout_ms ?? LIMITS.defaultTimeoutMs;
 
       const proc = Bun.spawn(['/bin/bash', '-c', command], {

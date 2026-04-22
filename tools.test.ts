@@ -413,3 +413,12 @@ test('bash omits the stderr block when stderr is empty', async () => {
   )) as string;
   expect(result).not.toContain('--- stderr ---');
 });
+
+test('bash rejects timeout_ms over the cap', async () => {
+  await expect(
+    tools.bash.execute!(
+      { command: 'echo x', timeout_ms: 700_000 },
+      ctx,
+    ),
+  ).rejects.toThrow();
+});
