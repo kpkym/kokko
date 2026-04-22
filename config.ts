@@ -9,6 +9,7 @@ export interface Config {
   provider: Provider;
   model: string;
   baseURL: string;
+  maxSteps: number;
 }
 
 function requireEnv(name: string): string {
@@ -25,6 +26,16 @@ function readProvider(): Provider {
   return v;
 }
 
+function readMaxSteps(): number {
+  const raw = process.env.AI_MAX_STEPS;
+  if (raw === undefined || raw === '') return 10;
+  const n = Number(raw);
+  if (!Number.isInteger(n) || n < 1) {
+    throw new Error(`Invalid AI_MAX_STEPS: ${raw} (expected positive integer)`);
+  }
+  return n;
+}
+
 function loadConfig(): Config {
   const provider = readProvider();
   switch (provider) {
@@ -34,6 +45,7 @@ function loadConfig(): Config {
         provider,
         model: requireEnv('OPENAI_MODEL'),
         baseURL: requireEnv('OPENAI_BASE_URL'),
+        maxSteps: readMaxSteps(),
       };
     case 'anthropic':
       requireEnv('ANTHROPIC_API_KEY');
@@ -41,6 +53,7 @@ function loadConfig(): Config {
         provider,
         model: requireEnv('ANTHROPIC_MODEL'),
         baseURL: requireEnv('ANTHROPIC_BASE_URL'),
+        maxSteps: readMaxSteps(),
       };
   }
 }
