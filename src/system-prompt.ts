@@ -32,6 +32,46 @@ export async function loadProjectDocs(cwd: string): Promise<ProjectDoc[]> {
   return docs;
 }
 
+export interface EnvInfo {
+  cwd: string;
+  platform: string;
+  shell: string | undefined;
+  date: string;
+  gitBranch: string | null;
+}
+
+export function formatSystemPrompt(
+  base: string,
+  env: EnvInfo,
+  docs: ProjectDoc[],
+): string {
+  const blocks: string[] = [];
+
+  blocks.push(['<base>', base, '</base>'].join('\n'));
+
+  const envLines: string[] = ['<environment>'];
+  envLines.push(`cwd: ${env.cwd}`);
+  envLines.push(`platform: ${env.platform}`);
+  if (env.shell !== undefined) envLines.push(`shell: ${env.shell}`);
+  envLines.push(`date: ${env.date}`);
+  if (env.gitBranch !== null) envLines.push(`git_branch: ${env.gitBranch}`);
+  envLines.push('</environment>');
+  blocks.push(envLines.join('\n'));
+
+  if (docs.length > 0) {
+    const docLines: string[] = ['<project_docs>'];
+    for (const doc of docs) {
+      docLines.push(`<file name="${doc.name}">`);
+      docLines.push(doc.contents);
+      docLines.push('</file>');
+    }
+    docLines.push('</project_docs>');
+    blocks.push(docLines.join('\n'));
+  }
+
+  return blocks.join('\n\n');
+}
+
 export function loadBasePrompt(): string {
   const path = process.env.KOKKO_SYSTEM_PROMPT_FILE;
   if (path === undefined || path === '') return BUILT_IN_PROMPT;

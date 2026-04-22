@@ -1,7 +1,7 @@
 import { test, expect } from 'bun:test';
 import { writeFile, rm, chmod } from 'node:fs/promises';
 import { join } from 'node:path';
-import { loadBasePrompt, loadProjectDocs } from './system-prompt';
+import { loadBasePrompt, loadProjectDocs, formatSystemPrompt, type EnvInfo } from './system-prompt';
 import { makeTempDir } from './tools/test-helpers';
 
 test('loadBasePrompt returns built-in default when env unset', () => {
@@ -100,4 +100,43 @@ test('loadProjectDocs throws when CLAUDE.md is present but unreadable', async ()
     await chmod(path, 0o644);
     await rm(dir, { recursive: true, force: true });
   }
+});
+
+test('formatSystemPrompt assembles base + environment + project_docs in order', () => {
+  const env: EnvInfo = {
+    cwd: '/proj',
+    platform: 'darwin',
+    shell: '/bin/zsh',
+    date: '2026-04-23',
+    gitBranch: 'main',
+  };
+  const out = formatSystemPrompt('BASE', env, [
+    { name: 'CLAUDE.md', contents: 'C-BODY' },
+    { name: 'AGENT.md', contents: 'A-BODY' },
+  ]);
+
+  expect(out).toBe(
+    [
+      '<base>',
+      'BASE',
+      '</base>',
+      '',
+      '<environment>',
+      'cwd: /proj',
+      'platform: darwin',
+      'shell: /bin/zsh',
+      'date: 2026-04-23',
+      'git_branch: main',
+      '</environment>',
+      '',
+      '<project_docs>',
+      '<file name="CLAUDE.md">',
+      'C-BODY',
+      '</file>',
+      '<file name="AGENT.md">',
+      'A-BODY',
+      '</file>',
+      '</project_docs>',
+    ].join('\n'),
+  );
 });
