@@ -399,3 +399,9 @@ test('bash respects cwd', async () => {
     await rm(dir, { recursive: true, force: true });
   }
 });
+
+test('bash rejects relative cwd', async () => {
+  await expect(
+    tools.bash.execute!({ command: 'pwd', cwd: './' }, ctx),
+  ).rejects.toThrow(/absolute/i);
+});
