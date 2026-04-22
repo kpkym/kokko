@@ -174,3 +174,22 @@ test('grep content mode truncates at 250 lines by default', async () => {
     await rm(dir, { recursive: true, force: true });
   }
 });
+
+test('grep content mode context:1 pulls one line before and after', async () => {
+  const dir = await makeTempDir();
+  try {
+    await writeFile(join(dir, 'a.ts'), 'line1\nline2\nhello line3\nline4\nline5\n');
+    const result = (await tools.grep.execute!(
+      { pattern: 'hello', path: dir, output_mode: 'content', context: 1 },
+      ctx,
+    )) as string;
+    const lines = result.split('\n');
+    expect(lines).toEqual([
+      `${join(dir, 'a.ts')}-2-line2`,
+      `${join(dir, 'a.ts')}:3:hello line3`,
+      `${join(dir, 'a.ts')}-4-line4`,
+    ]);
+  } finally {
+    await rm(dir, { recursive: true, force: true });
+  }
+});
