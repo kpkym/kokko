@@ -102,6 +102,45 @@ test('loadProjectDocs throws when CLAUDE.md is present but unreadable', async ()
   }
 });
 
+test('formatSystemPrompt omits <project_docs> block when docs is empty', () => {
+  const env: EnvInfo = {
+    cwd: '/proj',
+    platform: 'darwin',
+    shell: '/bin/zsh',
+    date: '2026-04-23',
+    gitBranch: 'main',
+  };
+  const out = formatSystemPrompt('BASE', env, []);
+  expect(out).not.toContain('<project_docs>');
+  expect(out).toContain('<environment>');
+  expect(out.endsWith('</environment>')).toBe(true);
+});
+
+test('formatSystemPrompt omits git_branch line when null', () => {
+  const env: EnvInfo = {
+    cwd: '/proj',
+    platform: 'darwin',
+    shell: '/bin/zsh',
+    date: '2026-04-23',
+    gitBranch: null,
+  };
+  const out = formatSystemPrompt('BASE', env, []);
+  expect(out).not.toContain('git_branch');
+  expect(out).not.toContain('null');
+});
+
+test('formatSystemPrompt omits shell line when undefined', () => {
+  const env: EnvInfo = {
+    cwd: '/proj',
+    platform: 'darwin',
+    shell: undefined,
+    date: '2026-04-23',
+    gitBranch: 'main',
+  };
+  const out = formatSystemPrompt('BASE', env, []);
+  expect(out).not.toContain('shell:');
+});
+
 test('formatSystemPrompt assembles base + environment + project_docs in order', () => {
   const env: EnvInfo = {
     cwd: '/proj',
