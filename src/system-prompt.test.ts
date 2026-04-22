@@ -73,3 +73,18 @@ test('loadProjectDocs returns just AGENT.md when only AGENT.md exists', async ()
     await rm(dir, { recursive: true, force: true });
   }
 });
+
+test('loadProjectDocs returns both files in fixed CLAUDE.md → AGENT.md order', async () => {
+  const dir = await makeTempDir();
+  try {
+    await writeFile(join(dir, 'AGENT.md'), 'A-BODY', 'utf-8');
+    await writeFile(join(dir, 'CLAUDE.md'), 'C-BODY', 'utf-8');
+    const docs = await loadProjectDocs(dir);
+    expect(docs).toEqual([
+      { name: 'CLAUDE.md', contents: 'C-BODY' },
+      { name: 'AGENT.md', contents: 'A-BODY' },
+    ]);
+  } finally {
+    await rm(dir, { recursive: true, force: true });
+  }
+});
