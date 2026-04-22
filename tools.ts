@@ -26,6 +26,47 @@ function detectBinary(bytes: Uint8Array): boolean {
   return false;
 }
 
+function truncateTail(bytes: Uint8Array, cap: number): { text: string; truncated: boolean; total: number } {
+  const total = bytes.length;
+  if (total <= cap) {
+    return { text: new TextDecoder('utf-8').decode(bytes), truncated: false, total };
+  }
+  const kept = bytes.subarray(total - cap);
+  return { text: new TextDecoder('utf-8').decode(kept), truncated: true, total };
+}
+
+function formatBashResult(
+  stdoutBytes: Uint8Array,
+  stderrBytes: Uint8Array,
+  exitCode: number,
+  timedOut: boolean,
+  timeoutMs: number,
+): string {
+  const out = truncateTail(stdoutBytes, LIMITS.maxBashBytes);
+  const err = truncateTail(stderrBytes, LIMITS.maxBashBytes);
+
+  const parts: string[] = [];
+  if (out.truncated) {
+    parts.push(`[truncated: kept last ${LIMITS.maxBashBytes} of ${out.total} bytes]`);
+  }
+  parts.push(out.text);
+
+  if (stderrBytes.length > 0) {
+    parts.push('--- stderr ---');
+    if (err.truncated) {
+      parts.push(`[truncated: kept last ${LIMITS.maxBashBytes} of ${err.total} bytes]`);
+    }
+    parts.push(err.text);
+  }
+
+  if (timedOut) {
+    parts.push(`[timed out after ${timeoutMs}ms; process killed]`);
+  }
+
+  parts.push(`[exit code: ${exitCode}]`);
+  return parts.join('\n');
+}
+
 export const tools = {
   get_current_time: tool({
     description: 'Get the current time as an ISO 8601 string.',
@@ -220,6 +261,56 @@ export const tools = {
         ? `[truncated: ${LIMITS.maxEntries} of ${LIMITS.maxEntries}+ matches]\n`
         : '';
       return header + results.join('\n');
+    },
+  }),
+
+  bash: tool({
+    description:
+      'Run a shell command via `/bin/bash -c`. Captures stdout and stderr separately and appends `[exit code: N]`. ' +
+      'Default timeout 2 min, max 10 min. On timeout: SIGTERM → 2 s grace → SIGKILL. Each stream truncated to the last 30 KB (tail kept). ' +
+      'Non-zero exits are returned in the string, not thrown.',
+    inputSchema: z.object({
+      command: z.string().min(1).describe('The shell command to run.'),
+      timeout_ms: z
+        .number()
+        .int()
+        .min(1)
+        .max(LIMITS.maxTimeoutMs)
+        .optional()
+        .describe('Timeout in milliseconds. Default 120000, max 600000.'),
+      cwd: z
+        .string()
+        .optional()
+        .describe('Absolute working directory. Defaults to the kokko process cwd.'),
+    }),
+    execute: async ({ command, timeout_ms, cwd }) => {
+      if (cwd !== undefined) requireAbsolute(cwd);
+      const timeoutMs = timeout_ms ?? LIMITS.defaultTimeoutMs;
+
+      const proc = Bun.spawn(['/bin/bash', '-c', command], {
+        cwd: cwd ?? process.cwd(),
+        stdout: 'pipe',
+        stderr: 'pipe',
+      });
+
+      let timedOut = false;
+      const term = setTimeout(() => {
+        timedOut = true;
+        proc.kill('SIGTERM');
+        setTimeout(() => {
+          if (proc.exitCode === null) proc.kill('SIGKILL');
+        }, 2000).unref();
+      }, timeoutMs);
+      term.unref();
+
+      const [stdoutBytes, stderrBytes, exitCode] = await Promise.all([
+        new Response(proc.stdout).bytes(),
+        new Response(proc.stderr).bytes(),
+        proc.exited,
+      ]);
+      clearTimeout(term);
+
+      return formatBashResult(stdoutBytes, stderrBytes, exitCode, timedOut, timeoutMs);
     },
   }),
 };

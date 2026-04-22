@@ -355,3 +355,13 @@ test('glob rejects relative cwd', async () => {
     tools.glob.execute!({ pattern: '*.ts', cwd: './' }, ctx),
   ).rejects.toThrow(/absolute/i);
 });
+
+test('bash echoes stdout and reports exit 0', async () => {
+  const result = (await tools.bash.execute!(
+    { command: 'echo hello' },
+    ctx,
+  )) as string;
+  expect(result).toContain('hello');
+  expect(result).toContain('[exit code: 0]');
+  expect(result).not.toContain('--- stderr ---');
+});
