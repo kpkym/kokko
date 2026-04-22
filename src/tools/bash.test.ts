@@ -1,6 +1,6 @@
 import { test, expect } from 'bun:test';
-import { tools } from './tools';
-import { mkdtemp, writeFile, mkdir, rm } from 'node:fs/promises';
+import { tools } from './index';
+import { mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
@@ -46,7 +46,6 @@ test('bash respects cwd', async () => {
       { command: 'pwd', cwd: dir },
       ctx,
     )) as string;
-    // macOS /tmp is a symlink to /private/tmp; accept either realpath.
     expect(result.includes(dir) || result.includes('/private' + dir)).toBe(true);
     expect(result).toContain('[exit code: 0]');
   } finally {
@@ -90,7 +89,6 @@ test('bash times out and marks the process killed', async () => {
 });
 
 test('bash truncates large stdout to the last 30000 bytes', async () => {
-  // yes $'a' | head -c 40000 → 40 KB of 'a' characters
   const result = (await tools.bash.execute!(
     { command: "yes a | tr -d '\\n' | head -c 40000" },
     ctx,
@@ -98,7 +96,6 @@ test('bash truncates large stdout to the last 30000 bytes', async () => {
   expect(result).toMatch(/\[truncated: kept last 30000 of 40000 bytes\]/);
   expect(result).toContain('[exit code: 0]');
 
-  // Tail-kept check: the truncated body should be exactly 30000 'a's.
   const header = '[truncated: kept last 30000 of 40000 bytes]\n';
   const afterHeader = result.slice(result.indexOf(header) + header.length);
   const body = afterHeader.slice(0, 30000);
@@ -106,7 +103,6 @@ test('bash truncates large stdout to the last 30000 bytes', async () => {
 });
 
 test('bash handles large stdout past the ArrayBuffer threshold', async () => {
-  // 500 KB of 'a' — reliably above Bun's Response.bytes() → ArrayBuffer boundary (~200 KB).
   const result = (await tools.bash.execute!(
     { command: "yes a | tr -d '\\n' | head -c 500000" },
     ctx,
