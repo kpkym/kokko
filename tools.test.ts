@@ -405,3 +405,11 @@ test('bash rejects relative cwd', async () => {
     tools.bash.execute!({ command: 'pwd', cwd: './' }, ctx),
   ).rejects.toThrow(/absolute/i);
 });
+
+test('bash omits the stderr block when stderr is empty', async () => {
+  const result = (await tools.bash.execute!(
+    { command: 'echo only-stdout' },
+    ctx,
+  )) as string;
+  expect(result).not.toContain('--- stderr ---');
+});
