@@ -23,12 +23,13 @@ Required env vars are enforced at startup by `src/config.ts` (missing ones throw
 - If `anthropic`: `ANTHROPIC_API_KEY`, `ANTHROPIC_BASE_URL`, `ANTHROPIC_MODEL`.
 - If `openai`: `OPENAI_API_KEY`, `OPENAI_BASE_URL`, `OPENAI_MODEL`.
 - `AI_MAX_STEPS` — optional integer ≥ 1, caps tool rounds per turn (default `10`).
+- `KOKKO_SYSTEM_PROMPT_FILE` — optional path; if set, its contents replace the built-in base system prompt.
 
 See `.env.example` for the shape.
 
 ## Architecture
 
-The codebase is deliberately small; three layers matter.
+The codebase is deliberately small; four layers matter.
 
 **REPL loop (`src/index.ts`).** Maintains a single `ModelMessage[]` across turns. Each turn calls `streamText({ model, messages, tools, stopWhen: stepCountIs(config.maxSteps) })` and renders the `fullStream` by part type: `text-delta` is printed inline; `tool-call` / `tool-result` / `tool-error` are rendered as `→ name(args)` / `← name ok|ERROR` status lines; `error` parts abort the stream without appending to history. On success, the full response messages (assistant text + tool calls + tool results) are appended so the next turn sees them.
 
@@ -42,6 +43,8 @@ The codebase is deliberately small; three layers matter.
 - `truncateTail(bytes, cap)` — keeps the last `cap` bytes and reports total; used by `bash` for stdout/stderr capping.
 
 Tools prefer Bun-native APIs (`Bun.file`, `Bun.write`, `Bun.Glob`, `Bun.spawn`) over `node:fs`. `bash` uses `Bun.spawn(['/bin/bash', '-c', command])` with a SIGTERM → 2 s grace → SIGKILL timeout chain and returns a formatted string containing stdout, an optional `--- stderr ---` block, and a trailing `[exit code: N]` — non-zero exits are returned, not thrown. `grep` shells out to system `ripgrep` with three output modes (`content` / `files_with_matches` / `count`); hidden + gitignored files are always searched, 60 s timeout.
+
+**System prompt (`src/system-prompt.ts`).** `buildSystemPrompt(cwd?)` runs once at startup and produces a single string with three tagged blocks: `<base>` (the built-in default, or contents of `KOKKO_SYSTEM_PROMPT_FILE` if set), `<environment>` (cwd, platform, shell, date, git branch — captured once per process), and `<project_docs>` (`CLAUDE.md` and `AGENT.md` from `cwd`, in that fixed order, omitted entirely if neither exists). The REPL prepends the result as a `system` message before the loop begins. Project docs missing → silent; project docs present-but-unreadable → throw; `KOKKO_SYSTEM_PROMPT_FILE` set but unreadable → throw; git branch lookup failure → `null`.
 
 ### Adding a tool
 
