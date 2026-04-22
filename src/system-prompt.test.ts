@@ -151,6 +151,7 @@ test('collectEnvInfo returns shape with cwd, platform, date, shell', async () =>
   } else {
     expect(env.shell).toBeUndefined();
   }
+  expect(env.gitBranch).toBeNull();
 });
 
 test('formatSystemPrompt assembles base + environment + project_docs in order', () => {

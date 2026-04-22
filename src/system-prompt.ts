@@ -45,7 +45,7 @@ export async function collectEnvInfo(cwd: string): Promise<EnvInfo> {
     cwd,
     platform: process.platform,
     shell: process.env.SHELL,
-    date: new Date().toISOString().slice(0, 10),
+    date: new Date().toLocaleDateString('sv'), // 'sv' (Swedish) locale formats as YYYY-MM-DD in local TZ
     gitBranch: null,
   };
 }
