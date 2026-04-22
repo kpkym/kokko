@@ -155,7 +155,7 @@ test('collectEnvInfo returns shape with cwd, platform, date, shell', async () =>
 });
 
 test('collectEnvInfo gitBranch is a string when cwd is a git repo', async () => {
-  const env = await collectEnvInfo('/Users/kpkym/ooo/homelab/github/kokko');
+  const env = await collectEnvInfo(import.meta.dir);
   expect(typeof env.gitBranch).toBe('string');
   expect(env.gitBranch!.length).toBeGreaterThan(0);
 });
