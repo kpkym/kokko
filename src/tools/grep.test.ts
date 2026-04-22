@@ -213,3 +213,18 @@ test('grep throws when context flags are set in a non-content mode', async () =>
     await rm(dir, { recursive: true, force: true });
   }
 });
+
+test('grep accepts a single file path (not only a directory)', async () => {
+  const dir = await makeTempDir();
+  try {
+    const file = join(dir, 'a.ts');
+    await writeFile(file, 'hello\n');
+    const result = (await tools.grep.execute!(
+      { pattern: 'hello', path: file },
+      ctx,
+    )) as string;
+    expect(result).toBe(file);
+  } finally {
+    await rm(dir, { recursive: true, force: true });
+  }
+});
