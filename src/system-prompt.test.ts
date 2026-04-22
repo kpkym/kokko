@@ -1,7 +1,7 @@
 import { test, expect } from 'bun:test';
 import { writeFile, rm } from 'node:fs/promises';
 import { join } from 'node:path';
-import { loadBasePrompt } from './system-prompt';
+import { loadBasePrompt, loadProjectDocs } from './system-prompt';
 import { makeTempDir } from './tools/test-helpers';
 
 test('loadBasePrompt returns built-in default when env unset', () => {
@@ -39,5 +39,15 @@ test('loadBasePrompt throws when KOKKO_SYSTEM_PROMPT_FILE points to nonexistent 
   } finally {
     if (prev !== undefined) process.env.KOKKO_SYSTEM_PROMPT_FILE = prev;
     else delete process.env.KOKKO_SYSTEM_PROMPT_FILE;
+  }
+});
+
+test('loadProjectDocs returns empty list when no docs present', async () => {
+  const dir = await makeTempDir();
+  try {
+    const docs = await loadProjectDocs(dir);
+    expect(docs).toEqual([]);
+  } finally {
+    await rm(dir, { recursive: true, force: true });
   }
 });
