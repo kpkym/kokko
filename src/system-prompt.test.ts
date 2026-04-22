@@ -170,6 +170,17 @@ test('collectEnvInfo gitBranch is null when cwd is not a git repo', async () => 
   }
 });
 
+test('collectEnvInfo shell is undefined when SHELL env var is unset', async () => {
+  const prev = process.env.SHELL;
+  delete process.env.SHELL;
+  try {
+    const env = await collectEnvInfo('/some/cwd');
+    expect(env.shell).toBeUndefined();
+  } finally {
+    if (prev !== undefined) process.env.SHELL = prev;
+  }
+});
+
 test('formatSystemPrompt assembles base + environment + project_docs in order', () => {
   const env: EnvInfo = {
     cwd: '/proj',
