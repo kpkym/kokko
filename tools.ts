@@ -49,7 +49,7 @@ function formatBashResult(
   if (out.truncated) {
     parts.push(`[truncated: kept last ${LIMITS.maxBashBytes} of ${out.total} bytes]`);
   }
-  parts.push(out.text);
+  if (out.text.length > 0) parts.push(out.text);
 
   if (stderrBytes.length > 0) {
     parts.push('--- stderr ---');
@@ -297,20 +297,23 @@ export const tools = {
       const term = setTimeout(() => {
         timedOut = true;
         proc.kill('SIGTERM');
+        // unref so the 2-s grace timer does not block process exit if proc already died
         setTimeout(() => {
           if (proc.exitCode === null) proc.kill('SIGKILL');
         }, 2000).unref();
       }, timeoutMs);
       term.unref();
 
-      const [stdoutBytes, stderrBytes, exitCode] = await Promise.all([
-        new Response(proc.stdout).bytes(),
-        new Response(proc.stderr).bytes(),
-        proc.exited,
-      ]);
-      clearTimeout(term);
-
-      return formatBashResult(stdoutBytes, stderrBytes, exitCode, timedOut, timeoutMs);
+      try {
+        const [stdoutBytes, stderrBytes, exitCode] = await Promise.all([
+          new Response(proc.stdout).bytes(),
+          new Response(proc.stderr).bytes(),
+          proc.exited,
+        ]);
+        return formatBashResult(stdoutBytes, stderrBytes, exitCode, timedOut, timeoutMs);
+      } finally {
+        clearTimeout(term);
+      }
     },
   }),
 };
