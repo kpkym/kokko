@@ -1,6 +1,7 @@
 import { streamText, stepCountIs, type ModelMessage } from 'ai';
 import * as readline from 'node:readline/promises';
 import { config, resolveModel } from './config';
+import { buildSystemPrompt } from './system-prompt';
 import { tools } from './tools';
 
 const terminal = readline.createInterface({
@@ -35,6 +36,8 @@ function formatErrorSummary(err: unknown): string {
 
 async function main() {
   const model = resolveModel();
+  const systemPrompt = await buildSystemPrompt();
+  messages.push({ role: 'system', content: systemPrompt });
   console.log(
     `kokko CLI [${config.provider}:${config.model}] — type a message, Ctrl+C to exit.\n`,
   );
