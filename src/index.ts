@@ -3,6 +3,7 @@ import * as readline from 'node:readline/promises';
 import { config, resolveModel } from './config';
 import { buildSystemPrompt } from './system-prompt';
 import { tools } from './tools';
+import { runCommand } from './commands';
 
 const terminal = readline.createInterface({
   input: process.stdin,
@@ -44,6 +45,13 @@ async function main() {
 
   while (true) {
     const userInput = await terminal.question('You: ');
+    const outcome = await runCommand(userInput, {
+      messages,
+      config,
+      terminal,
+      rebuildSystemPrompt: () => buildSystemPrompt(),
+    });
+    if (outcome === 'handled') continue;
     messages.push({ role: 'user', content: userInput });
 
     const result = streamText({
