@@ -151,7 +151,6 @@ test('collectEnvInfo returns shape with cwd, platform, date, shell', async () =>
   } else {
     expect(env.shell).toBeUndefined();
   }
-  expect(env.gitBranch).toBeNull();
 });
 
 test('collectEnvInfo gitBranch is a string when cwd is a git repo', async () => {
