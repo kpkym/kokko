@@ -91,6 +91,6 @@ test('handler errors are caught and printed as [command error]', async () => {
   }
 });
 
-test('registry includes the four implemented commands', () => {
-  expect(Object.keys(registry).sort()).toEqual(['clear', 'exit', 'model', 'provider']);
+test('registry includes the five implemented commands', () => {
+  expect(Object.keys(registry).sort()).toEqual(['clear', 'exit', 'help', 'model', 'provider']);
 });

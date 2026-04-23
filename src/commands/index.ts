@@ -1,11 +1,12 @@
 import type { Command, CommandContext } from './shared';
 import { clear } from './clear';
 import { exit } from './exit';
+import { help } from './help';
 import { model } from './model';
 import { provider } from './provider';
 
 export const registry: Record<string, Command> = Object.fromEntries(
-  [clear, exit, model, provider].map((c) => [c.name, c]),
+  [clear, exit, help, model, provider].map((c) => [c.name, c]),
 );
 
 export async function runCommand(
