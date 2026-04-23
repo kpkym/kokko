@@ -44,6 +44,8 @@ The codebase is deliberately small; four layers matter.
 
 Tools prefer Bun-native APIs (`Bun.file`, `Bun.write`, `Bun.Glob`, `Bun.spawn`) over `node:fs`. `bash` uses `Bun.spawn(['/bin/bash', '-c', command])` with a SIGTERM → 2 s grace → SIGKILL timeout chain and returns a formatted string containing stdout, an optional `--- stderr ---` block, and a trailing `[exit code: N]` — non-zero exits are returned, not thrown. `grep` shells out to system `ripgrep` with three output modes (`content` / `files_with_matches` / `count`); hidden + gitignored files are always searched, 60 s timeout.
 
+**Commands (`src/commands/`).** Local slash commands parsed and executed in-process — they never become user messages and never hit the model. Each command is its own file exporting a `Command` object (`name`, `description`, `run(args, ctx)`) and is registered in `src/commands/index.ts`. `runCommand(raw, ctx)` is called by the REPL before each `streamText` turn: if `raw` starts with `/`, the dispatcher looks up the command, runs it inside a try/catch (thrown errors surface as `[command error] /<name>: <msg>` and the REPL keeps running), and returns `"handled"` — causing the REPL to `continue` without touching `messages`. Otherwise returns `"not-a-command"` and the REPL proceeds as usual. `/clear` rebuilds the system prompt via a thunked `buildSystemPrompt()` *before* wiping `messages`, so a failed rebuild leaves session state untouched. `/help` reads the registry lazily via `await import('./index')` inside `run`, which breaks the help→index module cycle. Built-in commands: `/help`, `/clear`, `/exit`, `/model`, `/provider`.
+
 **System prompt (`src/system-prompt.ts`).** `buildSystemPrompt(cwd?)` runs once at startup and produces a single string with three tagged blocks: `<base>` (the built-in default, or contents of `KOKKO_SYSTEM_PROMPT_FILE` if set), `<environment>` (cwd, platform, shell, date, git branch — captured once per process), and `<project_docs>` (`CLAUDE.md` and `AGENT.md` from `cwd`, in that fixed order, omitted entirely if neither exists). The REPL prepends the result as a `system` message before the loop begins. Project docs missing → silent; project docs present-but-unreadable → throw; `KOKKO_SYSTEM_PROMPT_FILE` set but unreadable → throw; git branch lookup failure → `null`.
 
 ### Adding a tool
@@ -52,6 +54,12 @@ Tools prefer Bun-native APIs (`Bun.file`, `Bun.write`, `Bun.Glob`, `Bun.spawn`) 
 2. Enforce invariants in `execute`: call `requireAbsolute` on any path input, respect `LIMITS`, throw `Error` for preconditions. Thrown errors surface as `tool-error` parts in the REPL and are fed back to the model.
 3. Register in `src/tools/index.ts`.
 4. Add `src/tools/<name>.test.ts`. Use `tools.<name>.execute!(input, ctx)` via the `ctx` and `makeTempDir` helpers in `src/tools/test-helpers.ts`.
+
+### Adding a command
+
+1. Create `src/commands/<name>.ts` exporting a `Command` (`name` without leading slash, a one-line `description`, `run(args, ctx)`).
+2. Register it in `src/commands/index.ts` by adding it to the array passed to `Object.fromEntries`.
+3. Add `src/commands/<name>.test.ts`, using `makeCtx()` from `./test-helpers` and importing via `./index` when registration matters.
 
 ## Testing
 
