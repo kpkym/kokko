@@ -1,10 +1,10 @@
 import type { Command } from './shared';
-import { registry } from './index';
 
 export const help: Command = {
   name: 'help',
   description: 'List available slash commands.',
-  run() {
+  async run() {
+    const { registry } = await import('./index');
     const names = Object.keys(registry).sort();
     const width = names.reduce((m, n) => Math.max(m, n.length + 1), 0);
     for (const name of names) {
