@@ -2,8 +2,9 @@ import { streamText, stepCountIs, type ModelMessage } from 'ai';
 import * as readline from 'node:readline/promises';
 import { config, resolveModel } from './config';
 import { buildSystemPrompt } from './system-prompt';
-import { tools } from './tools';
+import { buildTools } from './tools';
 import { runCommand } from './commands';
+import { discoverSkills } from './skills/discover';
 
 const terminal = readline.createInterface({
   input: process.stdin,
@@ -37,7 +38,9 @@ function formatErrorSummary(err: unknown): string {
 
 async function main() {
   const model = resolveModel();
-  const systemPrompt = await buildSystemPrompt();
+  const skills = await discoverSkills(process.cwd());
+  const tools = buildTools({ skills });
+  const systemPrompt = await buildSystemPrompt(process.cwd(), skills);
   messages.push({ role: 'system', content: systemPrompt });
   console.log(
     `kokko CLI [${config.provider}:${config.model}] — type a message, Ctrl+C to exit.\n`,
@@ -49,7 +52,7 @@ async function main() {
       messages,
       config,
       terminal,
-      rebuildSystemPrompt: () => buildSystemPrompt(),
+      rebuildSystemPrompt: () => buildSystemPrompt(process.cwd(), skills),
     });
     if (outcome === 'handled') continue;
     messages.push({ role: 'user', content: userInput });
