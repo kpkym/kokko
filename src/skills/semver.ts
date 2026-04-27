@@ -12,10 +12,11 @@ export function compareSemver(a: string, b: string): number {
   if (pa === null || pb === null) {
     throw new Error(`compareSemver: invalid version: ${pa === null ? a : b}`);
   }
-  for (let i = 0; i < 3; i++) {
-    if (pa[i] !== pb[i]) return pa[i] - pb[i];
-  }
-  return 0;
+  const [aMaj, aMin, aPat] = pa;
+  const [bMaj, bMin, bPat] = pb;
+  if (aMaj !== bMaj) return aMaj - bMaj;
+  if (aMin !== bMin) return aMin - bMin;
+  return aPat - bPat;
 }
 
 export function pickHighestVersion(candidates: string[]): string | null {
