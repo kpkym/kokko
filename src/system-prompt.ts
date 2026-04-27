@@ -1,5 +1,7 @@
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
+import { discoverSkills } from './skills/discover';
+import type { SkillMetadata } from './skills/types';
 
 const BUILT_IN_PROMPT = `You are kokko, a terminal-based coding agent. You help the user with software engineering tasks in their current working directory by reading/editing files and running shell commands through the tools provided.
 
@@ -83,6 +85,7 @@ export function formatSystemPrompt(
   base: string,
   env: EnvInfo,
   docs: ProjectDoc[],
+  skills: SkillMetadata[],
 ): string {
   const blocks: string[] = [];
 
@@ -96,6 +99,19 @@ export function formatSystemPrompt(
   if (env.gitBranch !== null) envLines.push(`git_branch: ${env.gitBranch}`);
   envLines.push('</environment>');
   blocks.push(envLines.join('\n'));
+
+  if (skills.length > 0) {
+    const skillLines: string[] = ['<skills>'];
+    skillLines.push(
+      'Use load_skill(name) to fetch the full instructions for a skill before following it.',
+    );
+    skillLines.push('');
+    for (const s of skills) {
+      skillLines.push(`- ${s.name}: ${s.description}`);
+    }
+    skillLines.push('</skills>');
+    blocks.push(skillLines.join('\n'));
+  }
 
   if (docs.length > 0) {
     const docLines: string[] = ['<project_docs>'];
@@ -111,11 +127,15 @@ export function formatSystemPrompt(
   return blocks.join('\n\n');
 }
 
-export async function buildSystemPrompt(cwd: string = process.cwd()): Promise<string> {
+export async function buildSystemPrompt(
+  cwd: string = process.cwd(),
+  skills?: SkillMetadata[],
+): Promise<string> {
   const base = loadBasePrompt();
   const env = await collectEnvInfo(cwd);
   const docs = await loadProjectDocs(cwd);
-  return formatSystemPrompt(base, env, docs);
+  const resolvedSkills = skills ?? (await discoverSkills(cwd));
+  return formatSystemPrompt(base, env, docs, resolvedSkills);
 }
 
 export function loadBasePrompt(): string {

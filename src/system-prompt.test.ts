@@ -2,6 +2,7 @@ import { test, expect } from 'bun:test';
 import { writeFile, rm, chmod } from 'node:fs/promises';
 import { join } from 'node:path';
 import { loadBasePrompt, loadProjectDocs, formatSystemPrompt, collectEnvInfo, buildSystemPrompt, type EnvInfo } from './system-prompt';
+import type { SkillMetadata } from './skills/types';
 import { makeTempDir } from './tools/test-helpers';
 
 test('loadBasePrompt returns built-in default when env unset', () => {
@@ -110,7 +111,7 @@ test('formatSystemPrompt omits <project_docs> block when docs is empty', () => {
     date: '2026-04-23',
     gitBranch: 'main',
   };
-  const out = formatSystemPrompt('BASE', env, []);
+  const out = formatSystemPrompt('BASE', env, [], []);
   expect(out).not.toContain('<project_docs>');
   expect(out).toContain('<environment>');
   expect(out.endsWith('</environment>')).toBe(true);
@@ -124,7 +125,7 @@ test('formatSystemPrompt omits git_branch line when null', () => {
     date: '2026-04-23',
     gitBranch: null,
   };
-  const out = formatSystemPrompt('BASE', env, []);
+  const out = formatSystemPrompt('BASE', env, [], []);
   expect(out).not.toContain('git_branch');
   expect(out).toContain('<environment>');
 });
@@ -137,7 +138,7 @@ test('formatSystemPrompt omits shell line when undefined', () => {
     date: '2026-04-23',
     gitBranch: 'main',
   };
-  const out = formatSystemPrompt('BASE', env, []);
+  const out = formatSystemPrompt('BASE', env, [], []);
   expect(out).not.toContain('shell:');
 });
 
@@ -221,10 +222,15 @@ test('formatSystemPrompt assembles base + environment + project_docs in order', 
     date: '2026-04-23',
     gitBranch: 'main',
   };
-  const out = formatSystemPrompt('BASE', env, [
-    { name: 'CLAUDE.md', contents: 'C-BODY' },
-    { name: 'AGENT.md', contents: 'A-BODY' },
-  ]);
+  const out = formatSystemPrompt(
+    'BASE',
+    env,
+    [
+      { name: 'CLAUDE.md', contents: 'C-BODY' },
+      { name: 'AGENT.md', contents: 'A-BODY' },
+    ],
+    [],
+  );
 
   expect(out).toBe(
     [
@@ -250,4 +256,57 @@ test('formatSystemPrompt assembles base + environment + project_docs in order', 
       '</project_docs>',
     ].join('\n'),
   );
+});
+
+test('formatSystemPrompt omits <skills> block when skills is empty', () => {
+  const env: EnvInfo = {
+    cwd: '/proj',
+    platform: 'darwin',
+    shell: '/bin/zsh',
+    date: '2026-04-23',
+    gitBranch: 'main',
+  };
+  const out = formatSystemPrompt('BASE', env, [], []);
+  expect(out).not.toContain('<skills>');
+});
+
+test('formatSystemPrompt includes <skills> block between environment and project_docs', () => {
+  const env: EnvInfo = {
+    cwd: '/proj',
+    platform: 'darwin',
+    shell: '/bin/zsh',
+    date: '2026-04-23',
+    gitBranch: 'main',
+  };
+  const skills: SkillMetadata[] = [
+    { name: 'a', description: 'first', dir: '/tmp/a' },
+    { name: 'plugin:b', description: 'second', dir: '/tmp/b' },
+  ];
+  const out = formatSystemPrompt('BASE', env, [{ name: 'CLAUDE.md', contents: 'X' }], skills);
+
+  expect(out).toContain('<skills>');
+  expect(out).toContain('Use load_skill(name)');
+  expect(out).toContain('- a: first');
+  expect(out).toContain('- plugin:b: second');
+  expect(out.indexOf('<skills>')).toBeGreaterThan(out.indexOf('<environment>'));
+  expect(out.indexOf('<skills>')).toBeLessThan(out.indexOf('<project_docs>'));
+});
+
+test('formatSystemPrompt with skills but no docs places skills after environment', () => {
+  const env: EnvInfo = {
+    cwd: '/proj',
+    platform: 'darwin',
+    shell: '/bin/zsh',
+    date: '2026-04-23',
+    gitBranch: 'main',
+  };
+  const out = formatSystemPrompt(
+    'BASE',
+    env,
+    [],
+    [{ name: 'a', description: 'd', dir: '/tmp/a' }],
+  );
+  expect(out).toContain('<skills>');
+  expect(out).not.toContain('<project_docs>');
+  expect(out.indexOf('<skills>')).toBeGreaterThan(out.indexOf('<environment>'));
 });
