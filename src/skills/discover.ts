@@ -1,5 +1,6 @@
 import { join } from 'node:path';
 import { readdir } from 'node:fs/promises';
+import { homedir } from 'node:os';
 import type { SkillMetadata } from './types';
 import { parseSkillFrontmatter } from './frontmatter';
 import { pickHighestVersion } from './semver';
@@ -56,4 +57,35 @@ export async function discoverInPluginCache(cacheRoot: string): Promise<SkillMet
     }
   }
   return out;
+}
+
+function dedupeFirstWins(metas: SkillMetadata[]): SkillMetadata[] {
+  const seen = new Set<string>();
+  const out: SkillMetadata[] = [];
+  for (const m of metas) {
+    if (seen.has(m.name)) continue;
+    seen.add(m.name);
+    out.push(m);
+  }
+  return out;
+}
+
+export async function discoverSkills(cwd: string): Promise<SkillMetadata[]> {
+  const envOverride = process.env.KOKKO_SKILLS_DIR;
+  if (envOverride !== undefined && envOverride !== '') {
+    const paths = envOverride.split(':').filter((p) => p.length > 0);
+    const all: SkillMetadata[] = [];
+    for (const p of paths) {
+      all.push(...(await discoverInDir(p)));
+    }
+    return dedupeFirstWins(all);
+  }
+
+  const home = process.env.HOME ?? homedir();
+  const all: SkillMetadata[] = [];
+  all.push(...(await discoverInDir(join(cwd, 'skills'))));
+  all.push(...(await discoverInDir(join(cwd, '.claude', 'skills'))));
+  all.push(...(await discoverInDir(join(home, '.claude', 'skills'))));
+  all.push(...(await discoverInPluginCache(join(home, '.claude', 'plugins', 'cache'))));
+  return dedupeFirstWins(all);
 }

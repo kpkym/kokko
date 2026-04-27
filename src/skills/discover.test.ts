@@ -2,6 +2,7 @@ import { test, expect } from 'bun:test';
 import { mkdir, writeFile, rm } from 'node:fs/promises';
 import { join } from 'node:path';
 import { discoverInDir, discoverInPluginCache } from './discover';
+import { discoverSkills } from './discover';
 import { makeTempDir } from '../tools/test-helpers';
 
 async function writeSkill(dir: string, folder: string, name: string, description: string): Promise<string> {
@@ -169,5 +170,98 @@ test('discoverInPluginCache: tolerates plugin with no skills/ dir', async () => 
     expect(await discoverInPluginCache(cache)).toEqual([]);
   } finally {
     await rm(cache, { recursive: true, force: true });
+  }
+});
+
+function withEnv<T>(key: string, value: string | undefined, fn: () => Promise<T>): Promise<T> {
+  const prev = process.env[key];
+  if (value === undefined) delete process.env[key];
+  else process.env[key] = value;
+  return fn().finally(() => {
+    if (prev === undefined) delete process.env[key];
+    else process.env[key] = prev;
+  });
+}
+
+test('discoverSkills: KOKKO_SKILLS_DIR overrides defaults entirely', async () => {
+  const dirA = await makeTempDir();
+  const dirB = await makeTempDir();
+  try {
+    await writeSkill(dirA, 'one', 'one', 'first');
+    await writeSkill(dirB, 'two', 'two', 'second');
+    const out = await withEnv('KOKKO_SKILLS_DIR', `${dirA}:${dirB}`, () =>
+      discoverSkills('/some/cwd'),
+    );
+    expect(out.map((s) => s.name).sort()).toEqual(['one', 'two']);
+  } finally {
+    await rm(dirA, { recursive: true, force: true });
+    await rm(dirB, { recursive: true, force: true });
+  }
+});
+
+test('discoverSkills: KOKKO_SKILLS_DIR earlier path wins on name collision', async () => {
+  const dirA = await makeTempDir();
+  const dirB = await makeTempDir();
+  try {
+    await writeSkill(dirA, 'shared', 'shared', 'WINNER');
+    await writeSkill(dirB, 'shared', 'shared', 'LOSER');
+    const out = await withEnv('KOKKO_SKILLS_DIR', `${dirA}:${dirB}`, () =>
+      discoverSkills('/some/cwd'),
+    );
+    expect(out).toEqual([
+      expect.objectContaining({ name: 'shared', description: 'WINNER' }),
+    ]);
+  } finally {
+    await rm(dirA, { recursive: true, force: true });
+    await rm(dirB, { recursive: true, force: true });
+  }
+});
+
+test('discoverSkills: project ./skills/ wins over project ./.claude/skills/', async () => {
+  const cwd = await makeTempDir();
+  try {
+    await writeSkill(join(cwd, 'skills'), 'shared', 'shared', 'PROJECT');
+    await writeSkill(join(cwd, '.claude', 'skills'), 'shared', 'shared', 'CLAUDE');
+    const out = await withEnv('KOKKO_SKILLS_DIR', undefined, () => discoverSkills(cwd));
+    expect(out.find((s) => s.name === 'shared')?.description).toBe('PROJECT');
+  } finally {
+    await rm(cwd, { recursive: true, force: true });
+  }
+});
+
+test('discoverSkills: returns empty array when no defaults exist and no env override', async () => {
+  const cwd = await makeTempDir();
+  try {
+    // Override HOME so user-global path also doesn't exist.
+    const out = await withEnv('KOKKO_SKILLS_DIR', undefined, () =>
+      withEnv('HOME', cwd, () => discoverSkills(cwd)),
+    );
+    expect(out).toEqual([]);
+  } finally {
+    await rm(cwd, { recursive: true, force: true });
+  }
+});
+
+test('discoverSkills: empty KOKKO_SKILLS_DIR is treated as unset (uses defaults)', async () => {
+  const cwd = await makeTempDir();
+  try {
+    await writeSkill(join(cwd, 'skills'), 'only', 'only', 'desc');
+    const out = await withEnv('KOKKO_SKILLS_DIR', '', () =>
+      withEnv('HOME', cwd, () => discoverSkills(cwd)),
+    );
+    expect(out.map((s) => s.name)).toEqual(['only']);
+  } finally {
+    await rm(cwd, { recursive: true, force: true });
+  }
+});
+
+test('discoverSkills: ignores empty path segments inside KOKKO_SKILLS_DIR', async () => {
+  const dir = await makeTempDir();
+  try {
+    await writeSkill(dir, 'one', 'one', 'd');
+    const out = await withEnv('KOKKO_SKILLS_DIR', `:${dir}::`, () => discoverSkills('/cwd'));
+    expect(out.map((s) => s.name)).toEqual(['one']);
+  } finally {
+    await rm(dir, { recursive: true, force: true });
   }
 });
