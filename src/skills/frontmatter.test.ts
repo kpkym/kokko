@@ -75,3 +75,10 @@ test('tolerates CRLF line endings', () => {
   const text = `---\r\nname: a\r\ndescription: b\r\n---\r\nbody\r\n`;
   expect(parseSkillFrontmatter(text, path)).toEqual({ name: 'a', description: 'b' });
 });
+
+test('throws when frontmatter is a scalar, not a mapping', () => {
+  const text = `---\njust-a-string\n---\nbody\n`;
+  expect(() => parseSkillFrontmatter(text, path)).toThrow(
+    /\[skills\] \/fake\/SKILL\.md: frontmatter must be a YAML mapping/,
+  );
+});
