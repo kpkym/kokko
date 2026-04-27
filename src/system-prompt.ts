@@ -3,6 +3,15 @@ import { join } from 'node:path';
 import { discoverSkills } from './skills/discover';
 import type { SkillMetadata } from './skills/types';
 
+function escapeSkillField(s: string): string {
+  return s
+    .replace(/\s+/g, ' ')
+    .trim()
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;');
+}
+
 const BUILT_IN_PROMPT = `You are kokko, a terminal-based coding agent. You help the user with software engineering tasks in their current working directory by reading/editing files and running shell commands through the tools provided.
 
 Tool usage principles:
@@ -107,7 +116,7 @@ export function formatSystemPrompt(
     );
     skillLines.push('');
     for (const s of skills) {
-      skillLines.push(`- ${s.name}: ${s.description}`);
+      skillLines.push(`- ${escapeSkillField(s.name)}: ${escapeSkillField(s.description)}`);
     }
     skillLines.push('</skills>');
     blocks.push(skillLines.join('\n'));
