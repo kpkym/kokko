@@ -1,8 +1,10 @@
 import { test, expect } from 'bun:test';
-import { tools } from './index';
+import { buildTools } from './index';
 import { writeFile, mkdir, rm } from 'node:fs/promises';
 import { join } from 'node:path';
 import { ctx, makeTempDir } from './test-helpers';
+
+const tools = buildTools({ skills: [] });
 
 test('list_dir lists children with type markers, alphabetically, including dotfiles', async () => {
   const dir = await makeTempDir();

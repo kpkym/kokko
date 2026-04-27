@@ -1,6 +1,8 @@
 import { test, expect } from 'bun:test';
-import { tools } from './index';
+import { buildTools } from './index';
 import { ctx } from './test-helpers';
+
+const tools = buildTools({ skills: [] });
 
 test('get_current_time returns an ISO 8601 string', async () => {
   const result = await tools.get_current_time.execute!({}, ctx);

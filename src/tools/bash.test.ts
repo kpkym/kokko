@@ -1,7 +1,9 @@
 import { test, expect } from 'bun:test';
-import { tools } from './index';
+import { buildTools } from './index';
 import { rm } from 'node:fs/promises';
 import { ctx, makeTempDir } from './test-helpers';
+
+const tools = buildTools({ skills: [] });
 
 test('bash echoes stdout and reports exit 0', async () => {
   const result = (await tools.bash.execute!(

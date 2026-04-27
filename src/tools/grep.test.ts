@@ -1,8 +1,10 @@
 import { test, expect } from 'bun:test';
 import { writeFile, rm } from 'node:fs/promises';
 import { join } from 'node:path';
-import { tools } from './index';
+import { buildTools } from './index';
 import { ctx, makeTempDir } from './test-helpers';
+
+const tools = buildTools({ skills: [] });
 
 test('grep rejects relative path', async () => {
   await expect(

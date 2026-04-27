@@ -6,14 +6,19 @@ import { list_dir } from './list_dir';
 import { glob } from './glob';
 import { grep } from './grep';
 import { bash } from './bash';
+import { createLoadSkill } from './load_skill';
+import type { SkillMetadata } from '../skills/types';
 
-export const tools = {
-  get_current_time,
-  read_file,
-  write_file,
-  edit_file,
-  list_dir,
-  glob,
-  grep,
-  bash,
-};
+export function buildTools({ skills }: { skills: SkillMetadata[] }) {
+  return {
+    get_current_time,
+    read_file,
+    write_file,
+    edit_file,
+    list_dir,
+    glob,
+    grep,
+    bash,
+    load_skill: createLoadSkill(skills),
+  };
+}

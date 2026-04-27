@@ -1,8 +1,10 @@
 import { test, expect } from 'bun:test';
-import { tools } from './index';
+import { buildTools } from './index';
 import { writeFile, rm } from 'node:fs/promises';
 import { join } from 'node:path';
 import { ctx, makeTempDir } from './test-helpers';
+
+const tools = buildTools({ skills: [] });
 
 test('glob returns absolute paths matching a pattern', async () => {
   const dir = await makeTempDir();
