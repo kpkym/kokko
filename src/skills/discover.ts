@@ -28,9 +28,13 @@ export async function discoverInDir(
   for (const folder of entries) {
     const skillDir = join(dir, folder);
     const skillFile = join(skillDir, 'SKILL.md');
-    const file = Bun.file(skillFile);
-    if (!(await file.exists())) continue;
-    const text = await file.text();
+    let text: string;
+    try {
+      text = await Bun.file(skillFile).text();
+    } catch (err) {
+      if ((err as NodeJS.ErrnoException).code === 'ENOENT') continue;
+      throw err;
+    }
     const fm = parseSkillFrontmatter(text, skillFile);
     const name = opts.nameOverride ? opts.nameOverride(folder) : fm.name;
     out.push({ name, description: fm.description, dir: skillDir });
@@ -81,6 +85,8 @@ export async function discoverSkills(cwd: string): Promise<SkillMetadata[]> {
     return dedupeFirstWins(all);
   }
 
+  // Read HOME at call time (not via homedir(), which Bun caches at process startup)
+  // so tests can redirect user-global discovery to a temp dir via withEnv('HOME', ...).
   const home = process.env.HOME ?? homedir();
   const all: SkillMetadata[] = [];
   all.push(...(await discoverInDir(join(cwd, 'skills'))));

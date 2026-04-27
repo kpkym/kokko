@@ -265,3 +265,17 @@ test('discoverSkills: ignores empty path segments inside KOKKO_SKILLS_DIR', asyn
     await rm(dir, { recursive: true, force: true });
   }
 });
+
+test('discoverSkills: aborts with [skills] error when a project SKILL.md is malformed', async () => {
+  const cwd = await makeTempDir();
+  try {
+    const bad = join(cwd, 'skills', 'broken');
+    await mkdir(bad, { recursive: true });
+    await writeFile(join(bad, 'SKILL.md'), 'no frontmatter\n', 'utf-8');
+    await expect(
+      withEnv('KOKKO_SKILLS_DIR', undefined, () => discoverSkills(cwd)),
+    ).rejects.toThrow(/\[skills\] .*broken\/SKILL\.md: missing frontmatter fence/);
+  } finally {
+    await rm(cwd, { recursive: true, force: true });
+  }
+});
