@@ -14,6 +14,7 @@ test('buildTools: returns all static tools plus load_skill', () => {
       'list_dir',
       'load_skill',
       'read_file',
+      'web_search',
       'write_file',
     ].sort(),
   );
