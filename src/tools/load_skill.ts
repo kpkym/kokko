@@ -3,6 +3,14 @@ import { z } from 'zod';
 import { join } from 'node:path';
 import type { SkillMetadata } from '../skills/types';
 
+function escapeAttr(s: string): string {
+  return s
+    .replace(/&/g, '&amp;')
+    .replace(/"/g, '&quot;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;');
+}
+
 export function createLoadSkill(skills: SkillMetadata[]) {
   const byName = new Map<string, SkillMetadata>();
   for (const s of skills) byName.set(s.name, s);
@@ -17,7 +25,7 @@ export function createLoadSkill(skills: SkillMetadata[]) {
       const meta = byName.get(name);
       if (!meta) throw new Error(`unknown skill: ${name}`);
       const body = await Bun.file(join(meta.dir, 'SKILL.md')).text();
-      return `<skill name="${meta.name}" dir="${meta.dir}">\n${body}\n</skill>`;
+      return `<skill name="${escapeAttr(meta.name)}" dir="${escapeAttr(meta.dir)}">\n${body}\n</skill>`;
     },
   });
 }

@@ -55,3 +55,27 @@ test('load_skill: namespaced names work', async () => {
     await rm(dir, { recursive: true, force: true });
   }
 });
+
+test('load_skill: escapes XML special characters in name and dir attributes', async () => {
+  const dir = await makeTempDir();
+  try {
+    const skillDir = join(dir, 'has-quotes');
+    await mkdir(skillDir, { recursive: true });
+    await writeFile(
+      join(skillDir, 'SKILL.md'),
+      `---\nname: weird\ndescription: d\n---\nbody\n`,
+      'utf-8',
+    );
+    // Inject hostile chars into both name and dir to confirm escaping.
+    const tool = createLoadSkill([
+      { name: 'a"b<c>d&e', description: 'd', dir: skillDir },
+    ]);
+    const out = await tool.execute!({ name: 'a"b<c>d&e' }, ctx);
+    expect(out).toContain('name="a&quot;b&lt;c&gt;d&amp;e"');
+    expect(out).toContain(`dir="${skillDir}"`); // tempdir name has no special chars
+    // Confirm no raw closing-tag-like sequence in the attrs.
+    expect(out).not.toContain('"b<c>');
+  } finally {
+    await rm(dir, { recursive: true, force: true });
+  }
+});
