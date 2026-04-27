@@ -1,94 +1,94 @@
-import { describe, expect, test } from 'bun:test';
-import { rm, mkdtemp } from 'node:fs/promises';
-import { tmpdir } from 'node:os';
-import { join } from 'node:path';
-import { appendStore } from './store';
-import { rank, cosineSimilarity, search } from './search';
-import type { Store } from './store';
+import { describe, expect, test, beforeEach, afterEach, mock } from 'bun:test';
 
-async function makeDir() {
-  return await mkdtemp(join(tmpdir(), 'kokko-search-'));
-}
+const upsert = mock(async (_records: unknown) => ({}));
+const query = mock(async (_opts: unknown) => ({ matches: [] }));
+const listIndexes = mock(async () => ({ indexes: [{ name: 'kokko' }] }));
+const createIndex = mock(async (_opts: unknown) => ({}));
+const indexFn = mock(<T>(_name: string) => ({ upsert, query }) as unknown as T);
 
-describe('cosineSimilarity', () => {
-  test('identical vectors → 1', () => {
-    const a = new Float32Array([1, 2, 3]);
-    expect(cosineSimilarity(a, a)).toBeCloseTo(1, 5);
+mock.module('@pinecone-database/pinecone', () => ({
+  Pinecone: class {
+    listIndexes = listIndexes;
+    createIndex = createIndex;
+    index = indexFn;
+  },
+}));
+
+const embedQueryMock = mock(async (_text: string) => [1, 0, 0]);
+mock.module('./embed', () => ({
+  embedQuery: embedQueryMock,
+  embedDocuments: async (_xs: string[]) => [],
+  DEFAULT_MODEL: 'voyage-3-large',
+}));
+
+const { search } = await import('./search');
+
+describe('search (pinecone)', () => {
+  const prevKey = process.env.PINECONE_API_KEY;
+
+  beforeEach(() => {
+    upsert.mockClear();
+    query.mockClear();
+    embedQueryMock.mockClear();
+    process.env.PINECONE_API_KEY = 'test-key';
   });
 
-  test('orthogonal vectors → 0', () => {
-    const a = new Float32Array([1, 0, 0]);
-    const b = new Float32Array([0, 1, 0]);
-    expect(cosineSimilarity(a, b)).toBeCloseTo(0, 5);
+  afterEach(() => {
+    if (prevKey === undefined) delete process.env.PINECONE_API_KEY;
+    else process.env.PINECONE_API_KEY = prevKey;
   });
 
-  test('zero vector → 0', () => {
-    const a = new Float32Array([1, 2, 3]);
-    const z = new Float32Array([0, 0, 0]);
-    expect(cosineSimilarity(a, z)).toBe(0);
-  });
-
-  test('honors offsetB into a flat store', () => {
-    const a = new Float32Array([1, 0, 0]);
-    const flat = new Float32Array([0, 1, 0, 1, 0, 0]);
-    expect(cosineSimilarity(a, flat, 0)).toBeCloseTo(0, 5);
-    expect(cosineSimilarity(a, flat, 3)).toBeCloseTo(1, 5);
-  });
-});
-
-describe('rank', () => {
-  test('orders by similarity and applies topK + threshold', () => {
-    const store: Store = {
-      dir: '/x',
-      dim: 2,
-      chunks: [
-        { id: '1', source: '/a', content: 'aa' },
-        { id: '2', source: '/b', content: 'bb' },
-        { id: '3', source: '/c', content: 'cc' },
+  test('embeds query then queries pinecone with topK and includeMetadata', async () => {
+    query.mockResolvedValueOnce({
+      matches: [
+        { id: '1', score: 0.92, metadata: { source: '/a.md', content: 'aa' } },
+        { id: '2', score: 0.71, metadata: { source: '/b.md', content: 'bb' } },
       ],
-      vectors: new Float32Array([1, 0, 0.9, 0.1, 0, 1]),
-    };
-    const q = new Float32Array([1, 0]);
-    const hits = rank(store, q, 2, 0.5);
-    expect(hits.map((h) => h.content)).toEqual(['aa', 'bb']);
-    expect(hits[0]!.similarity).toBeGreaterThan(hits[1]!.similarity);
+    });
+    const hits = await search('what?', 4, 0.5);
+    expect(embedQueryMock).toHaveBeenCalledTimes(1);
+    expect(query).toHaveBeenCalledTimes(1);
+    expect(query.mock.calls[0]?.[0]).toMatchObject({
+      vector: [1, 0, 0],
+      topK: 4,
+      includeMetadata: true,
+    });
+    expect(hits).toEqual([
+      { source: '/a.md', content: 'aa', similarity: 0.92 },
+      { source: '/b.md', content: 'bb', similarity: 0.71 },
+    ]);
   });
 
-  test('throws on dim mismatch', () => {
-    const store: Store = { dir: '/x', dim: 3, chunks: [], vectors: new Float32Array(0) };
-    expect(() => rank(store, new Float32Array([1, 0]), 4, 0.5)).toThrow(/dim/);
-  });
-});
-
-describe('search', () => {
-  test('returns [] when no store exists', async () => {
-    const dir = await makeDir();
-    try {
-      const prev = process.env.VOYAGE_API_KEY;
-      delete process.env.VOYAGE_API_KEY;
-      try {
-        expect(await search(dir, 'q')).toEqual([]);
-      } finally {
-        if (prev !== undefined) process.env.VOYAGE_API_KEY = prev;
-      }
-    } finally {
-      await rm(dir, { recursive: true, force: true });
-    }
+  test('filters out matches below threshold', async () => {
+    query.mockResolvedValueOnce({
+      matches: [
+        { id: '1', score: 0.8, metadata: { source: '/a', content: 'aa' } },
+        { id: '2', score: 0.4, metadata: { source: '/b', content: 'bb' } },
+        { id: '3', score: 0.3, metadata: { source: '/c', content: 'cc' } },
+      ],
+    });
+    const hits = await search('q', 5, 0.5);
+    expect(hits.map((h) => h.content)).toEqual(['aa']);
   });
 
-  test('throws via embedQuery when store exists but no api key', async () => {
-    const dir = await makeDir();
-    try {
-      await appendStore(dir, [{ id: 'a', source: '/x', content: 'hi' }], [[1, 0, 0]]);
-      const prev = process.env.VOYAGE_API_KEY;
-      delete process.env.VOYAGE_API_KEY;
-      try {
-        await expect(search(dir, 'q')).rejects.toThrow(/VOYAGE_API_KEY/);
-      } finally {
-        if (prev !== undefined) process.env.VOYAGE_API_KEY = prev;
-      }
-    } finally {
-      await rm(dir, { recursive: true, force: true });
-    }
+  test('skips matches with missing metadata', async () => {
+    query.mockResolvedValueOnce({
+      matches: [
+        { id: '1', score: 0.9 },
+        { id: '2', score: 0.8, metadata: { source: '/b', content: 'bb' } },
+      ],
+    });
+    const hits = await search('q', 4, 0.5);
+    expect(hits).toEqual([{ source: '/b', content: 'bb', similarity: 0.8 }]);
+  });
+
+  test('returns [] when pinecone returns no matches', async () => {
+    query.mockResolvedValueOnce({ matches: [] });
+    expect(await search('q')).toEqual([]);
+  });
+
+  test('throws when PINECONE_API_KEY missing', async () => {
+    delete process.env.PINECONE_API_KEY;
+    await expect(search('q')).rejects.toThrow(/PINECONE_API_KEY/);
   });
 });

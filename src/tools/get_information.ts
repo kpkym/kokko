@@ -1,6 +1,6 @@
 import { tool } from 'ai';
 import { z } from 'zod';
-import { search, defaultRagDir, DEFAULT_TOP_K } from '../embeddings';
+import { search, DEFAULT_TOP_K } from '../embeddings';
 
 export const get_information = tool({
   description:
@@ -9,7 +9,7 @@ export const get_information = tool({
     question: z.string().min(1).describe("The user's question, in their own words."),
   }),
   execute: async ({ question }) => {
-    const hits = await search(defaultRagDir(), question, DEFAULT_TOP_K);
+    const hits = await search(question, DEFAULT_TOP_K);
     if (hits.length === 0) {
       return { hits: [], note: 'no relevant content found in knowledge base' };
     }

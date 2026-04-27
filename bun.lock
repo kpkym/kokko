@@ -8,6 +8,7 @@
         "@ai-sdk/anthropic": "^3.0.71",
         "@ai-sdk/devtools": "^0.0.15",
         "@ai-sdk/openai": "^3.0.53",
+        "@pinecone-database/pinecone": "^7.2.0",
         "ai": "^6.0.168",
         "exa-js": "^2.12.1",
         "voyage-ai-provider": "^3.0.0",
@@ -39,6 +40,8 @@
     "@hono/node-server": ["@hono/node-server@1.19.14", "", { "peerDependencies": { "hono": "^4" } }, "sha512-GwtvgtXxnWsucXvbQXkRgqksiH2Qed37H9xHZocE5sA3N8O8O8/8FA3uclQXxXVzc9XBZuEOMK7+r02FmSpHtw=="],
 
     "@opentelemetry/api": ["@opentelemetry/api@1.9.0", "", {}, "sha512-3giAOQvZiH5F9bMlMiv8+GSPMeqg0dbaeo58/0SlA9sxSqZhnUtxzX9/2FzyhS9sWQf5S0GJE0AKBrFqjpeYcg=="],
+
+    "@pinecone-database/pinecone": ["@pinecone-database/pinecone@7.2.0", "", {}, "sha512-urGsnNDWSSqSaWdyEF2P6V5bTNtRA6yMQTheFYAKKwk7mkloRBBETtT2ADF5Y8gJTr88pW5D8NTcCCLe+f0e2Q=="],
 
     "@standard-schema/spec": ["@standard-schema/spec@1.1.0", "", {}, "sha512-l2aFy5jALhniG5HgqrD6jXLi/rUWrKvqN/qJx6yoJsgKhblVd+iqqU4RCXavm/jPityDo5TCvKMnpjKnOriy0w=="],
 

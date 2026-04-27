@@ -1,8 +1,4 @@
-import { join } from 'node:path';
-import { mkdir } from 'node:fs/promises';
-
-const MAGIC = 0x4b4b4245;
-const HEADER_BYTES = 8;
+import { Pinecone, type Index } from '@pinecone-database/pinecone';
 
 export interface Chunk {
   id: string;
@@ -10,113 +6,69 @@ export interface Chunk {
   content: string;
 }
 
-export interface Store {
-  dir: string;
-  dim: number;
-  chunks: Chunk[];
-  vectors: Float32Array;
+export type ChunkMetadata = { source: string; content: string };
+
+const DEFAULT_INDEX = 'kokko';
+const DEFAULT_CLOUD = 'aws';
+const DEFAULT_REGION = 'us-east-1';
+
+function getClient(): Pinecone {
+  const apiKey = process.env.PINECONE_API_KEY;
+  if (!apiKey) throw new Error('Missing required env var: PINECONE_API_KEY');
+  return new Pinecone({ apiKey });
 }
 
-export function defaultRagDir(cwd = process.cwd()): string {
-  return process.env.KOKKO_RAG_DIR ?? join(cwd, '.kokko', 'rag');
+export function indexName(): string {
+  return process.env.KOKKO_PINECONE_INDEX ?? DEFAULT_INDEX;
 }
 
-function chunksPath(dir: string) {
-  return join(dir, 'chunks.jsonl');
-}
-function vectorsPath(dir: string) {
-  return join(dir, 'embeddings.bin');
+export function getIndex(): Index<ChunkMetadata> {
+  return getClient().index<ChunkMetadata>(indexName());
 }
 
-export async function loadStore(dir: string): Promise<Store | null> {
-  const cf = Bun.file(chunksPath(dir));
-  const vf = Bun.file(vectorsPath(dir));
-  if (!(await cf.exists()) || !(await vf.exists())) return null;
-
-  const text = await cf.text();
-  const chunks: Chunk[] = text
-    .split('\n')
-    .filter((l) => l !== '')
-    .map((l) => JSON.parse(l) as Chunk);
-
-  const buf = new Uint8Array(await vf.arrayBuffer());
-  if (buf.byteLength < HEADER_BYTES) {
-    throw new Error(`embeddings.bin too small (${buf.byteLength} bytes)`);
-  }
-  const view = new DataView(buf.buffer, buf.byteOffset, buf.byteLength);
-  const magic = view.getUint32(0, true);
-  if (magic !== MAGIC) throw new Error(`embeddings.bin: bad magic ${magic.toString(16)}`);
-  const dim = view.getUint32(4, true);
-  if (dim === 0) throw new Error('embeddings.bin: zero dim');
-
-  const expectedBytes = HEADER_BYTES + chunks.length * dim * 4;
-  if (buf.byteLength !== expectedBytes) {
-    throw new Error(
-      `embeddings.bin size mismatch: got ${buf.byteLength}, expected ${expectedBytes} for ${chunks.length} × ${dim}`,
-    );
-  }
-  const vectors = new Float32Array(buf.buffer, buf.byteOffset + HEADER_BYTES, chunks.length * dim);
-  return { dir, dim, chunks, vectors: new Float32Array(vectors) };
+export async function ensureIndex(dim: number): Promise<void> {
+  const pc = getClient();
+  const name = indexName();
+  const list = await pc.listIndexes();
+  const exists = (list.indexes ?? []).some((ix) => ix.name === name);
+  if (exists) return;
+  await pc.createIndex({
+    name,
+    dimension: dim,
+    metric: 'cosine',
+    spec: {
+      serverless: {
+        cloud: (process.env.PINECONE_CLOUD ?? DEFAULT_CLOUD) as 'aws' | 'gcp' | 'azure',
+        region: process.env.PINECONE_REGION ?? DEFAULT_REGION,
+      },
+    },
+    waitUntilReady: true,
+  });
 }
 
 export async function appendStore(
-  dir: string,
-  newChunks: Chunk[],
-  newVectors: number[][],
-): Promise<{ added: number; total: number; dim: number }> {
-  if (newChunks.length !== newVectors.length) {
-    throw new Error(`chunks/vectors length mismatch: ${newChunks.length} vs ${newVectors.length}`);
+  chunks: Chunk[],
+  vectors: number[][],
+): Promise<{ added: number; dim: number }> {
+  if (chunks.length !== vectors.length) {
+    throw new Error(`chunks/vectors length mismatch: ${chunks.length} vs ${vectors.length}`);
   }
-  if (newChunks.length === 0) {
-    const existing = await loadStore(dir);
-    return {
-      added: 0,
-      total: existing?.chunks.length ?? 0,
-      dim: existing?.dim ?? 0,
-    };
-  }
-  const firstDim = newVectors[0]!.length;
-  if (firstDim === 0) throw new Error('vector with zero dim');
-  for (const v of newVectors) {
-    if (v.length !== firstDim) {
-      throw new Error(`vector dim mismatch: ${v.length} vs ${firstDim}`);
-    }
+  if (chunks.length === 0) return { added: 0, dim: 0 };
+
+  const dim = vectors[0]!.length;
+  if (dim === 0) throw new Error('vector with zero dim');
+  for (const v of vectors) {
+    if (v.length !== dim) throw new Error(`vector dim mismatch: ${v.length} vs ${dim}`);
   }
 
-  await mkdir(dir, { recursive: true });
-  const existing = await loadStore(dir);
-  if (existing && existing.dim !== firstDim) {
-    throw new Error(
-      `dim mismatch: store has ${existing.dim}, new vectors have ${firstDim}. Delete ${dir} to re-index with a different model.`,
-    );
-  }
-
-  const oldJsonl = existing ? await Bun.file(chunksPath(dir)).text() : '';
-  const newJsonl = newChunks.map((c) => JSON.stringify(c)).join('\n') + '\n';
-  await Bun.write(chunksPath(dir), oldJsonl + newJsonl);
-
-  const flatLen = newChunks.length * firstDim;
-  const flat = new Float32Array(flatLen);
-  for (let i = 0; i < newChunks.length; i++) {
-    flat.set(newVectors[i]!, i * firstDim);
-  }
-  const flatBytes = new Uint8Array(flat.buffer, flat.byteOffset, flat.byteLength);
-
-  if (existing) {
-    const oldBuf = new Uint8Array(await Bun.file(vectorsPath(dir)).arrayBuffer());
-    const merged = new Uint8Array(oldBuf.byteLength + flatBytes.byteLength);
-    merged.set(oldBuf, 0);
-    merged.set(flatBytes, oldBuf.byteLength);
-    await Bun.write(vectorsPath(dir), merged);
-  } else {
-    const out = new Uint8Array(HEADER_BYTES + flatBytes.byteLength);
-    const view = new DataView(out.buffer);
-    view.setUint32(0, MAGIC, true);
-    view.setUint32(4, firstDim, true);
-    out.set(flatBytes, HEADER_BYTES);
-    await Bun.write(vectorsPath(dir), out);
-  }
-
-  const totalChunks = (existing?.chunks.length ?? 0) + newChunks.length;
-  return { added: newChunks.length, total: totalChunks, dim: firstDim };
+  await ensureIndex(dim);
+  const index = getIndex();
+  await index.upsert({
+    records: chunks.map((c, i) => ({
+      id: c.id,
+      values: vectors[i]!,
+      metadata: { source: c.source, content: c.content },
+    })),
+  });
+  return { added: chunks.length, dim };
 }

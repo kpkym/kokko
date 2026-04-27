@@ -1,57 +1,70 @@
-import { describe, expect, test, beforeEach, afterEach } from 'bun:test';
-import { rm, mkdtemp } from 'node:fs/promises';
-import { tmpdir } from 'node:os';
-import { join } from 'node:path';
-import { buildTools } from './index';
-import { ctx } from './test-helpers';
-import { appendStore } from '../embeddings';
+import { describe, expect, test, beforeEach, afterEach, mock } from 'bun:test';
 
+const query = mock(async (_opts: unknown) => ({ matches: [] }));
+const listIndexes = mock(async () => ({ indexes: [{ name: 'kokko' }] }));
+const createIndex = mock(async (_opts: unknown) => ({}));
+const indexFn = mock(<T>(_name: string) => ({ upsert: async () => ({}), query }) as unknown as T);
+
+mock.module('@pinecone-database/pinecone', () => ({
+  Pinecone: class {
+    listIndexes = listIndexes;
+    createIndex = createIndex;
+    index = indexFn;
+  },
+}));
+
+const embedQueryMock = mock(async (_text: string) => [1, 0, 0]);
+mock.module('../embeddings/embed', () => ({
+  embedQuery: embedQueryMock,
+  embedDocuments: async (_xs: string[]) => [],
+  DEFAULT_MODEL: 'voyage-3-large',
+}));
+
+const { buildTools } = await import('./index');
+const { ctx } = await import('./test-helpers');
 const tools = buildTools({ skills: [] });
 
-async function makeDir() {
-  return await mkdtemp(join(tmpdir(), 'kokko-getinfo-'));
-}
-
 describe('get_information', () => {
-  const prevKey = process.env.VOYAGE_API_KEY;
-  const prevDir = process.env.KOKKO_RAG_DIR;
+  const prevKey = process.env.PINECONE_API_KEY;
 
   beforeEach(() => {
-    delete process.env.VOYAGE_API_KEY;
+    query.mockClear();
+    embedQueryMock.mockClear();
+    process.env.PINECONE_API_KEY = 'test-key';
   });
 
   afterEach(() => {
-    if (prevKey === undefined) delete process.env.VOYAGE_API_KEY;
-    else process.env.VOYAGE_API_KEY = prevKey;
-    if (prevDir === undefined) delete process.env.KOKKO_RAG_DIR;
-    else process.env.KOKKO_RAG_DIR = prevDir;
+    if (prevKey === undefined) delete process.env.PINECONE_API_KEY;
+    else process.env.PINECONE_API_KEY = prevKey;
   });
 
-  test('returns empty hits when no store exists', async () => {
-    const dir = await makeDir();
-    try {
-      process.env.KOKKO_RAG_DIR = dir;
-      const out = (await tools.get_information.execute!(
-        { question: 'anything' },
-        ctx,
-      )) as { hits: unknown[]; note?: string };
-      expect(out.hits).toEqual([]);
-      expect(out.note).toMatch(/no relevant/);
-    } finally {
-      await rm(dir, { recursive: true, force: true });
-    }
+  test('returns formatted hits when pinecone returns matches', async () => {
+    query.mockResolvedValueOnce({
+      matches: [
+        { id: '1', score: 0.876543, metadata: { source: '/a.md', content: 'aa' } },
+      ],
+    });
+    const out = (await tools.get_information.execute!(
+      { question: 'q' },
+      ctx,
+    )) as { hits: Array<{ source: string; content: string; similarity: number }> };
+    expect(out.hits).toEqual([{ source: '/a.md', content: 'aa', similarity: 0.8765 }]);
   });
 
-  test('throws when store exists but VOYAGE_API_KEY missing', async () => {
-    const dir = await makeDir();
-    try {
-      process.env.KOKKO_RAG_DIR = dir;
-      await appendStore(dir, [{ id: 'a', source: '/x', content: 'hi' }], [[1, 0, 0]]);
-      await expect(
-        tools.get_information.execute!({ question: 'q' }, ctx),
-      ).rejects.toThrow(/VOYAGE_API_KEY/);
-    } finally {
-      await rm(dir, { recursive: true, force: true });
-    }
+  test('returns empty hits + note when no matches', async () => {
+    query.mockResolvedValueOnce({ matches: [] });
+    const out = (await tools.get_information.execute!(
+      { question: 'q' },
+      ctx,
+    )) as { hits: unknown[]; note?: string };
+    expect(out.hits).toEqual([]);
+    expect(out.note).toMatch(/no relevant/);
+  });
+
+  test('throws when PINECONE_API_KEY missing', async () => {
+    delete process.env.PINECONE_API_KEY;
+    await expect(tools.get_information.execute!({ question: 'q' }, ctx)).rejects.toThrow(
+      /PINECONE_API_KEY/,
+    );
   });
 });
