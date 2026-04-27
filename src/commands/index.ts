@@ -4,9 +4,10 @@ import { exit } from './exit';
 import { help } from './help';
 import { model } from './model';
 import { provider } from './provider';
+import { indexCmd } from './index_cmd';
 
 export const registry: Record<string, Command> = Object.fromEntries(
-  [clear, exit, help, model, provider].map((c) => [c.name, c]),
+  [clear, exit, help, model, provider, indexCmd].map((c) => [c.name, c]),
 );
 
 export async function runCommand(

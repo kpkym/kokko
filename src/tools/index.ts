@@ -7,6 +7,7 @@ import { glob } from './glob';
 import { grep } from './grep';
 import { bash } from './bash';
 import { web_search } from './web_search';
+import { get_information } from './get_information';
 import { createLoadSkill } from './load_skill';
 import type { SkillMetadata } from '../skills/types';
 
@@ -21,6 +22,7 @@ export function buildTools({ skills }: { skills: SkillMetadata[] }) {
     grep,
     bash,
     web_search,
+    get_information,
     load_skill: createLoadSkill(skills),
   };
 }

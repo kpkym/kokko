@@ -9,6 +9,7 @@ test('buildTools: returns all static tools plus load_skill', () => {
       'bash',
       'edit_file',
       'get_current_time',
+      'get_information',
       'glob',
       'grep',
       'list_dir',
