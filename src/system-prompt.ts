@@ -112,7 +112,13 @@ export function formatSystemPrompt(
   if (skills.length > 0) {
     const skillLines: string[] = ['<skills>'];
     skillLines.push(
-      'Use load_skill(name) to fetch the full instructions for a skill before following it.',
+      'The following skills are available — each entry says when the skill applies.',
+    );
+    skillLines.push(
+      'Use load_skill(name) FIRST to fetch the full instructions when a user request matches a skill, then follow them step-by-step rather than improvising.',
+    );
+    skillLines.push(
+      'If multiple skills could apply, prefer the most specific one. If none clearly matches, do not call load_skill.',
     );
     skillLines.push('');
     for (const s of skills) {

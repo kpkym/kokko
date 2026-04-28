@@ -116,7 +116,17 @@ async function main() {
       process.stdout.write('\n');
 
       if (!streamAborted) {
-        const response = await result.response;
+        const [finishReason, response] = await Promise.all([
+          result.finishReason,
+          result.response,
+        ]);
+        if (finishReason === 'tool-calls') {
+          process.stdout.write(
+            pc.dim(
+              `· step cap (${config.maxSteps}) reached — send any message to continue\n`,
+            ),
+          );
+        }
         messages.push(...response.messages);
       }
     } catch (err) {
