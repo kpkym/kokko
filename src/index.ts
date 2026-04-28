@@ -47,13 +47,20 @@ async function main() {
     pc.dim(`kokko CLI [${config.provider}:${config.model}] — type a message, Ctrl+C to exit.\n`),
   );
 
+  const rebuildSystemPrompt = async () => {
+    const fresh = await discoverSkills(process.cwd());
+    skills.length = 0;
+    skills.push(...fresh);
+    return await buildSystemPrompt(process.cwd(), skills);
+  };
+
   while (true) {
     const userInput = await terminal.question('You: ');
     const outcome = await runCommand(userInput, {
       messages,
       config,
       terminal,
-      rebuildSystemPrompt: () => buildSystemPrompt(process.cwd(), skills),
+      rebuildSystemPrompt,
     });
     if (outcome === 'handled') continue;
     messages.push({ role: 'user', content: userInput });

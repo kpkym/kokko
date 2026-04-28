@@ -28,7 +28,7 @@ function readProvider(): Provider {
 
 function readMaxSteps(): number {
   const raw = process.env.AI_MAX_STEPS;
-  if (raw === undefined || raw === '') return 10;
+  if (raw === undefined || raw === '') return 50;
   const n = Number(raw);
   if (!Number.isInteger(n) || n < 1) {
     throw new Error(`Invalid AI_MAX_STEPS: ${raw} (expected positive integer)`);

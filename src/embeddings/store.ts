@@ -46,6 +46,31 @@ export async function ensureIndex(dim: number): Promise<void> {
   });
 }
 
+export function sourceKey(source: string): string {
+  return Bun.hash(source).toString(36);
+}
+
+export async function deleteBySource(source: string): Promise<number> {
+  const idx = getIndex();
+  const prefix = `${sourceKey(source)}#`;
+  let deleted = 0;
+  let paginationToken: string | undefined;
+  while (true) {
+    const page = await idx.listPaginated({ prefix, paginationToken });
+    const ids = (page.vectors ?? [])
+      .map((v) => v.id)
+      .filter((id): id is string => typeof id === 'string');
+    if (ids.length > 0) {
+      await idx.deleteMany(ids);
+      deleted += ids.length;
+    }
+    const next = page.pagination?.next;
+    if (!next) break;
+    paginationToken = next;
+  }
+  return deleted;
+}
+
 export async function appendStore(
   chunks: Chunk[],
   vectors: number[][],

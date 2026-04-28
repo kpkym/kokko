@@ -42,10 +42,23 @@ describe('web_search', () => {
       {
         title: 'Example',
         url: 'https://example.com/a',
-        content: 'a'.repeat(1000),
+        content: 'a'.repeat(2000),
         publishedDate: '2026-01-02',
       },
     ]);
+    const callOpts = searchAndContents.mock.calls[0]?.[1] as { livecrawl: string; numResults: number };
+    expect(callOpts.livecrawl).toBe('fallback');
+    expect(callOpts.numResults).toBe(5);
+  });
+
+  test('honors num_results and livecrawl overrides', async () => {
+    await tools.web_search.execute!(
+      { query: 'q', num_results: 3, livecrawl: 'always' },
+      ctx,
+    );
+    const callOpts = searchAndContents.mock.calls[0]?.[1] as { livecrawl: string; numResults: number };
+    expect(callOpts.livecrawl).toBe('always');
+    expect(callOpts.numResults).toBe(3);
   });
 
   test('throws when EXA_API_KEY is missing', async () => {

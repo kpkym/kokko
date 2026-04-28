@@ -6,7 +6,18 @@ import { join } from 'node:path';
 const upsert = mock(async (_records: unknown) => ({}));
 const listIndexes = mock(async () => ({ indexes: [{ name: 'kokko' }] }));
 const createIndex = mock(async (_opts: unknown) => ({}));
-const indexFn = mock(<T>(_name: string) => ({ upsert, query: async () => ({ matches: [] }) }) as unknown as T);
+type ListPage = { vectors: Array<{ id: string }>; pagination?: { next?: string } };
+const listPaginated = mock(async (_opts: unknown): Promise<ListPage> => ({
+  vectors: [],
+  pagination: undefined,
+}));
+const deleteMany = mock(async (_ids: string[]) => ({}));
+const indexFn = mock(<T>(_name: string) => ({
+  upsert,
+  query: async () => ({ matches: [] }),
+  listPaginated,
+  deleteMany,
+}) as unknown as T);
 
 mock.module('@pinecone-database/pinecone', () => ({
   Pinecone: class {
@@ -40,6 +51,9 @@ describe('/index', () => {
   beforeEach(() => {
     upsert.mockClear();
     embedDocumentsMock.mockClear();
+    listPaginated.mockClear();
+    deleteMany.mockClear();
+    listPaginated.mockImplementation(async () => ({ vectors: [], pagination: undefined }));
     process.env.PINECONE_API_KEY = 'test-key';
   });
 
@@ -90,6 +104,44 @@ describe('/index', () => {
       expect(arg.records.length).toBe(1);
       expect(arg.records[0]!.metadata.content).toBe('hello world');
       expect(arg.records[0]!.metadata.source).toBe(join(work, 'a.md'));
+    } finally {
+      await rm(work, { recursive: true, force: true });
+    }
+  });
+
+  test('evicts prior chunks for the same source before upserting', async () => {
+    const work = await makeWorkdir();
+    try {
+      const file = join(work, 'a.md');
+      await writeFile(file, 'hello world');
+      listPaginated.mockImplementation(async () => ({
+        vectors: [{ id: 'old1' }, { id: 'old2' }],
+        pagination: undefined,
+      }));
+      await indexCmd.run([file], makeCtx());
+      expect(deleteMany).toHaveBeenCalledTimes(1);
+      expect(deleteMany.mock.calls[0]?.[0]).toEqual(['old1', 'old2']);
+      expect(upsert).toHaveBeenCalledTimes(1);
+    } finally {
+      await rm(work, { recursive: true, force: true });
+    }
+  });
+
+  test('paginates through listPaginated when evicting', async () => {
+    const work = await makeWorkdir();
+    try {
+      const file = join(work, 'a.md');
+      await writeFile(file, 'hi');
+      let call = 0;
+      listPaginated.mockImplementation(async () => {
+        call++;
+        if (call === 1) return { vectors: [{ id: 'p1' }], pagination: { next: 'tok' } };
+        return { vectors: [{ id: 'p2' }], pagination: undefined };
+      });
+      await indexCmd.run([file], makeCtx());
+      expect(deleteMany).toHaveBeenCalledTimes(2);
+      expect(deleteMany.mock.calls[0]?.[0]).toEqual(['p1']);
+      expect(deleteMany.mock.calls[1]?.[0]).toEqual(['p2']);
     } finally {
       await rm(work, { recursive: true, force: true });
     }

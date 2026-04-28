@@ -1,7 +1,7 @@
 import { getIndex } from './store';
 import { embedQuery } from './embed';
 
-export const DEFAULT_TOP_K = 4;
+export const DEFAULT_TOP_K = 5;
 export const DEFAULT_THRESHOLD = 0.5;
 
 export interface SearchHit {
