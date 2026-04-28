@@ -1,3 +1,4 @@
+import pc from 'picocolors';
 import type { Command, CommandContext } from './shared';
 import { clear } from './clear';
 import { exit } from './exit';
@@ -20,13 +21,13 @@ export async function runCommand(
   const [head, ...args] = trimmed.split(/\s+/);
   const name = head.slice(1);
   if (name === '') {
-    console.log('unknown command: / — try /help');
+    console.log(pc.yellow('unknown command: / — try /help'));
     return 'handled';
   }
 
   const command = registry[name];
   if (!command) {
-    console.log(`unknown command: /${name} — try /help`);
+    console.log(pc.yellow(`unknown command: /${name} — try /help`));
     return 'handled';
   }
 
@@ -34,7 +35,7 @@ export async function runCommand(
     await command.run(args, ctx);
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
-    console.log(`[command error] /${name}: ${msg}`);
+    console.log(pc.red(`[command error] /${name}: ${msg}`));
   }
   return 'handled';
 }

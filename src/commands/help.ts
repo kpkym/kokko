@@ -1,3 +1,4 @@
+import pc from 'picocolors';
 import type { Command } from './shared';
 
 export const help: Command = {
@@ -9,7 +10,7 @@ export const help: Command = {
     const width = names.reduce((m, n) => Math.max(m, n.length + 1), 0);
     for (const name of names) {
       const slashed = `/${name}`.padEnd(width + 1);
-      console.log(`  ${slashed}  ${registry[name].description}`);
+      console.log(`  ${pc.cyan(slashed)}  ${pc.dim(registry[name].description)}`);
     }
   },
 };

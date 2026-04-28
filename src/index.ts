@@ -1,5 +1,6 @@
 import { streamText, stepCountIs, type ModelMessage } from 'ai';
 import * as readline from 'node:readline/promises';
+import pc from 'picocolors';
 import { config, resolveModel } from './config';
 import { buildSystemPrompt } from './system-prompt';
 import { buildTools } from './tools';
@@ -43,7 +44,7 @@ async function main() {
   const systemPrompt = await buildSystemPrompt(process.cwd(), skills);
   messages.push({ role: 'system', content: systemPrompt });
   console.log(
-    `kokko CLI [${config.provider}:${config.model}] — type a message, Ctrl+C to exit.\n`,
+    pc.dim(`kokko CLI [${config.provider}:${config.model}] — type a message, Ctrl+C to exit.\n`),
   );
 
   while (true) {
@@ -64,7 +65,7 @@ async function main() {
       stopWhen: stepCountIs(config.maxSteps),
     });
 
-    process.stdout.write('\nAssistant: ');
+    process.stdout.write(pc.bold(pc.cyan('\nAssistant: ')));
     let lineOpen = true;
     let streamAborted = false;
 
@@ -78,27 +79,31 @@ async function main() {
           }
           case 'tool-call': {
             if (lineOpen) process.stdout.write('\n');
-            process.stdout.write(`→ ${part.toolName}(${formatArgs(part.input)})\n`);
+            process.stdout.write(
+              pc.dim(`→ ${part.toolName}(${formatArgs(part.input)})\n`),
+            );
             lineOpen = false;
             break;
           }
           case 'tool-result': {
             process.stdout.write(
-              `← ${part.toolName} ${formatResultSummary(part.output)}\n`,
+              pc.green(`← ${part.toolName} ${formatResultSummary(part.output)}\n`),
             );
             lineOpen = false;
             break;
           }
           case 'tool-error': {
             process.stdout.write(
-              `← ${part.toolName} ${formatErrorSummary(part.error)}\n`,
+              pc.red(`← ${part.toolName} ${formatErrorSummary(part.error)}\n`),
             );
             lineOpen = false;
             break;
           }
           case 'error': {
             if (lineOpen) process.stdout.write('\n');
-            process.stdout.write(`[stream error] ${formatErrorSummary(part.error)}\n`);
+            process.stdout.write(
+              pc.red(`[stream error] ${formatErrorSummary(part.error)}\n`),
+            );
             lineOpen = false;
             streamAborted = true;
             break;
@@ -116,7 +121,7 @@ async function main() {
       }
     } catch (err) {
       if (lineOpen) process.stdout.write('\n');
-      process.stdout.write(`[stream error] ${formatErrorSummary(err)}\n\n`);
+      process.stdout.write(pc.red(`[stream error] ${formatErrorSummary(err)}\n\n`));
     }
   }
 }
