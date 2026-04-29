@@ -1,5 +1,6 @@
 import { streamText, stepCountIs, type ModelMessage } from 'ai';
 import * as readline from 'node:readline/promises';
+import { emitKeypressEvents } from 'node:readline';
 import pc from 'picocolors';
 import { config, resolveModel } from './config';
 import { buildSystemPrompt } from './system-prompt';
@@ -12,7 +13,14 @@ const terminal = readline.createInterface({
   output: process.stdout,
 });
 
+emitKeypressEvents(process.stdin);
+
 const messages: ModelMessage[] = [];
+
+process.on('SIGINT', () => {
+  process.stdout.write('\n');
+  process.exit(0);
+});
 
 function truncate(s: string, max = 80): string {
   return s.length <= max ? s : s.slice(0, max - 1) + '…';
@@ -44,7 +52,9 @@ async function main() {
   const systemPrompt = await buildSystemPrompt(process.cwd(), skills);
   messages.push({ role: 'system', content: systemPrompt });
   console.log(
-    pc.dim(`kokko CLI [${config.provider}:${config.model}] — type a message, Ctrl+C to exit.\n`),
+    pc.dim(
+      `kokko CLI [${config.provider}:${config.model}] — type a message, Esc to abort, Ctrl+C to exit.\n`,
+    ),
   );
 
   const rebuildSystemPrompt = async () => {
@@ -65,11 +75,23 @@ async function main() {
     if (outcome === 'handled') continue;
     messages.push({ role: 'user', content: userInput });
 
+    const abort = new AbortController();
+    const onKeypress = (
+      _s: string | undefined,
+      key: { name?: string } | undefined,
+    ) => {
+      if (key?.name === 'escape') abort.abort('user-interrupt');
+    };
+    const wasRaw = process.stdin.isRaw ?? false;
+    if (process.stdin.isTTY) process.stdin.setRawMode(true);
+    process.stdin.on('keypress', onKeypress);
+
     const result = streamText({
       model,
       messages,
       tools,
       stopWhen: stepCountIs(config.maxSteps),
+      abortSignal: abort.signal,
     });
 
     process.stdout.write(pc.bold(pc.cyan('\nAssistant: ')));
@@ -122,7 +144,10 @@ async function main() {
       if (lineOpen) process.stdout.write('\n');
       process.stdout.write('\n');
 
-      if (!streamAborted) {
+      if (abort.signal.aborted && abort.signal.reason === 'user-interrupt') {
+        process.stdout.write(pc.yellow('[aborted]\n\n'));
+        messages.pop();
+      } else if (!streamAborted) {
         const [finishReason, response] = await Promise.all([
           result.finishReason,
           result.response,
@@ -138,7 +163,15 @@ async function main() {
       }
     } catch (err) {
       if (lineOpen) process.stdout.write('\n');
-      process.stdout.write(pc.red(`[stream error] ${formatErrorSummary(err)}\n\n`));
+      if (abort.signal.aborted && abort.signal.reason === 'user-interrupt') {
+        process.stdout.write(pc.yellow('[aborted]\n\n'));
+        messages.pop();
+      } else {
+        process.stdout.write(pc.red(`[stream error] ${formatErrorSummary(err)}\n\n`));
+      }
+    } finally {
+      process.stdin.off('keypress', onKeypress);
+      if (process.stdin.isTTY) process.stdin.setRawMode(wasRaw);
     }
   }
 }
