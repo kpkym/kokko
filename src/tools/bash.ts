@@ -1,6 +1,6 @@
 import { tool } from 'ai';
 import { z } from 'zod';
-import { requireAbsolute, truncateTail } from './shared';
+import { requireAbsolute, spawnWithTimeout, truncateTail } from './shared';
 
 const BASH_LIMITS = {
   maxBashBytes: 30_000,
@@ -68,33 +68,10 @@ export const bash = tool({
     }
     const timeoutMs = timeout_ms ?? BASH_LIMITS.defaultTimeoutMs;
 
-    const proc = Bun.spawn(['/bin/bash', '-c', command], {
+    const r = await spawnWithTimeout(['/bin/bash', '-c', command], {
       cwd: cwd ?? process.cwd(),
-      stdout: 'pipe',
-      stderr: 'pipe',
+      timeoutMs,
     });
-
-    let timedOut = false;
-    const term = setTimeout(() => {
-      timedOut = true;
-      proc.kill('SIGTERM');
-      setTimeout(() => {
-        if (proc.exitCode === null) proc.kill('SIGKILL');
-      }, 2000).unref();
-    }, timeoutMs);
-    term.unref();
-
-    try {
-      const [stdoutBuf, stderrBuf, exitCode] = await Promise.all([
-        new Response(proc.stdout).arrayBuffer(),
-        new Response(proc.stderr).arrayBuffer(),
-        proc.exited,
-      ]);
-      const stdoutBytes = new Uint8Array(stdoutBuf);
-      const stderrBytes = new Uint8Array(stderrBuf);
-      return formatBashResult(stdoutBytes, stderrBytes, exitCode, timedOut, timeoutMs);
-    } finally {
-      clearTimeout(term);
-    }
+    return formatBashResult(r.stdoutBytes, r.stderrBytes, r.exitCode, r.timedOut, timeoutMs);
   },
 });

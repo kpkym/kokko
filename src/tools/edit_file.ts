@@ -37,10 +37,10 @@ export const edit_file = tool({
     if (!(await file.exists())) {
       throw new Error(`edit_file: file not found (path=${path})`);
     }
-    let content = await file.text();
-    if (new TextEncoder().encode(content).length > LIMITS.maxWriteBytes) {
+    if (file.size > LIMITS.maxWriteBytes) {
       throw new Error(`edit_file: file exceeds ${LIMITS.maxWriteBytes} bytes`);
     }
+    let content = await file.text();
 
     let totalReplacements = 0;
     edits.forEach((e, i) => {

@@ -147,6 +147,33 @@ describe('/index', () => {
     }
   });
 
+  test('batches multiple files into one embed call and one upsert call', async () => {
+    const work = await makeWorkdir();
+    try {
+      await writeFile(join(work, 'a.md'), 'alpha');
+      await writeFile(join(work, 'b.md'), 'beta');
+      await writeFile(join(work, 'c.md'), 'gamma');
+      await indexCmd.run([work], makeCtx());
+      expect(embedDocumentsMock).toHaveBeenCalledTimes(1);
+      expect((embedDocumentsMock.mock.calls[0]?.[0] as string[]).slice().sort()).toEqual([
+        'alpha',
+        'beta',
+        'gamma',
+      ]);
+      expect(upsert).toHaveBeenCalledTimes(1);
+      const arg = upsert.mock.calls[0]?.[0] as {
+        records: Array<{ metadata: { source: string; content: string } }>;
+      };
+      expect(arg.records.map((r) => r.metadata.content).sort()).toEqual([
+        'alpha',
+        'beta',
+        'gamma',
+      ]);
+    } finally {
+      await rm(work, { recursive: true, force: true });
+    }
+  });
+
   test('throws when PINECONE_API_KEY missing', async () => {
     delete process.env.PINECONE_API_KEY;
     const work = await makeWorkdir();

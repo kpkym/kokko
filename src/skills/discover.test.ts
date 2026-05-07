@@ -65,6 +65,18 @@ test('discoverInDir: ignores subfolders without SKILL.md', async () => {
   }
 });
 
+test('discoverInDir: ignores non-directory entries like .DS_Store', async () => {
+  const dir = await makeTempDir();
+  try {
+    await writeFile(join(dir, '.DS_Store'), 'macos junk\n', 'utf-8');
+    await writeSkill(dir, 'has-skill', 'has-skill', 'desc');
+    const out = await discoverInDir(dir);
+    expect(out.map((s) => s.name)).toEqual(['has-skill']);
+  } finally {
+    await rm(dir, { recursive: true, force: true });
+  }
+});
+
 test('discoverInDir: throws when a SKILL.md is malformed', async () => {
   const dir = await makeTempDir();
   try {

@@ -47,12 +47,9 @@ export const indexCmd: Command = {
       return;
     }
 
-    let totalAdded = 0;
-    let totalDeleted = 0;
-    let totalEmptyOrUnchanged = 0;
     let skipped = 0;
-    let dim = 0;
-
+    let totalEmptyOrUnchanged = 0;
+    const perFile: Array<{ file: string; pieces: string[] }> = [];
     for (const file of files) {
       const f = Bun.file(file);
       if (f.size > LIMITS.maxBytes) {
@@ -60,26 +57,33 @@ export const indexCmd: Command = {
         continue;
       }
       const text = await f.text();
-      const pieces = chunk(text);
+      perFile.push({ file, pieces: chunk(text) });
+    }
 
-      const removed = await deleteBySource(file);
-      totalDeleted += removed;
-
+    const allChunks: Chunk[] = [];
+    for (const { file, pieces } of perFile) {
       if (pieces.length === 0) {
         totalEmptyOrUnchanged++;
         continue;
       }
-
-      const fileChunks: Chunk[] = pieces.map((piece) => ({
-        id: makeId(file, piece),
-        source: file,
-        content: piece,
-      }));
-      const vectors = await embedDocuments(fileChunks.map((c) => c.content));
-      const r = await appendStore(fileChunks, vectors);
-      totalAdded += r.added;
-      if (r.dim) dim = r.dim;
+      for (const piece of pieces) {
+        allChunks.push({ id: makeId(file, piece), source: file, content: piece });
+      }
     }
+
+    // Embed first so a quota/network failure leaves the store untouched.
+    const vectors =
+      allChunks.length > 0 ? await embedDocuments(allChunks.map((c) => c.content)) : [];
+
+    // Evict old chunks for every visited file in parallel before upsert (delete-by-prefix
+    // would wipe new ids too if it ran after).
+    const deletedCounts = await Promise.all(perFile.map(({ file }) => deleteBySource(file)));
+    const totalDeleted = deletedCounts.reduce((a, b) => a + b, 0);
+
+    const r =
+      allChunks.length > 0 ? await appendStore(allChunks, vectors) : { added: 0, dim: 0 };
+    const totalAdded = r.added;
+    const dim = r.dim;
 
     if (totalAdded === 0 && totalDeleted === 0) {
       console.log(

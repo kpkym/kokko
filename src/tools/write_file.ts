@@ -12,10 +12,10 @@ export const write_file = tool({
   }),
   execute: async ({ path, content }) => {
     requireAbsolute(path);
-    const bytes = new TextEncoder().encode(content);
-    if (bytes.length > LIMITS.maxWriteBytes) {
+    const byteLen = Buffer.byteLength(content, 'utf8');
+    if (byteLen > LIMITS.maxWriteBytes) {
       throw new Error(
-        `write_file: content exceeds ${LIMITS.maxWriteBytes} bytes (got ${bytes.length})`,
+        `write_file: content exceeds ${LIMITS.maxWriteBytes} bytes (got ${byteLen})`,
       );
     }
     const lastSlash = path.lastIndexOf('/');
@@ -23,6 +23,6 @@ export const write_file = tool({
       await mkdir(path.substring(0, lastSlash), { recursive: true });
     }
     await Bun.write(path, content);
-    return `wrote ${bytes.length} bytes to ${path}`;
+    return `wrote ${byteLen} bytes to ${path}`;
   },
 });

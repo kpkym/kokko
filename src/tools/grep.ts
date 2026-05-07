@@ -1,6 +1,6 @@
 import { tool } from 'ai';
 import { z } from 'zod';
-import { LIMITS, requireAbsolute } from './shared';
+import { LIMITS, requireAbsolute, spawnWithTimeout } from './shared';
 
 const GREP_LIMITS = {
   contentDefaultLines: 250,
@@ -18,47 +18,26 @@ interface SpawnResult {
 }
 
 async function runRg(flags: string[], pattern: string, path: string): Promise<SpawnResult> {
-  let proc: ReturnType<typeof Bun.spawn>;
+  let r;
   try {
-    proc = Bun.spawn(['rg', ...flags, '--', pattern, path], {
-      stdout: 'pipe',
-      stderr: 'pipe',
+    r = await spawnWithTimeout(['rg', ...flags, '--', pattern, path], {
+      timeoutMs: GREP_LIMITS.timeoutMs,
+      graceMs: GREP_LIMITS.graceMs,
     });
   } catch (err) {
-    const code = (err as NodeJS.ErrnoException).code;
-    if (code === 'ENOENT') {
+    if ((err as NodeJS.ErrnoException).code === 'ENOENT') {
       throw new Error(
         'grep: ripgrep (`rg`) not found on PATH. Install it (e.g. `brew install ripgrep`) and retry.',
       );
     }
     throw err;
   }
-
-  let timedOut = false;
-  const term = setTimeout(() => {
-    timedOut = true;
-    proc.kill('SIGTERM');
-    setTimeout(() => {
-      if (proc.exitCode === null) proc.kill('SIGKILL');
-    }, GREP_LIMITS.graceMs).unref();
-  }, GREP_LIMITS.timeoutMs);
-  term.unref();
-
-  try {
-    const [stdoutBuf, stderrBuf, exitCode] = await Promise.all([
-      new Response(proc.stdout).arrayBuffer(),
-      new Response(proc.stderr).arrayBuffer(),
-      proc.exited,
-    ]);
-    return {
-      stdout: new TextDecoder('utf-8').decode(new Uint8Array(stdoutBuf)),
-      stderr: new TextDecoder('utf-8').decode(new Uint8Array(stderrBuf)),
-      exitCode,
-      timedOut,
-    };
-  } finally {
-    clearTimeout(term);
-  }
+  return {
+    stdout: new TextDecoder('utf-8').decode(r.stdoutBytes),
+    stderr: new TextDecoder('utf-8').decode(r.stderrBytes),
+    exitCode: r.exitCode,
+    timedOut: r.timedOut,
+  };
 }
 
 interface FlagInputs {
